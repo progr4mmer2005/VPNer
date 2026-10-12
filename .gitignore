@@ -1,0 +1,4 @@
+.tools/
+build/
+dist/
+internal/assets/agent/*.gz

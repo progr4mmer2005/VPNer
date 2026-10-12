@@ -118,6 +118,10 @@ func edgePath() string {
 // OpenAppWindow shows the UI as a standalone app window (Edge app mode, which
 // ships with every Windows 10/11), falling back to the default browser.
 func OpenAppWindow(url, profileDir string) error {
+	// One window only: if it is already open, just bring it to the front.
+	if FocusAppWindow(AppWindowTitle) {
+		return nil
+	}
 	if edge := edgePath(); edge != "" {
 		cmd := exec.Command(edge, "--app="+url, "--user-data-dir="+profileDir, "--window-size=1180,820",
 			"--no-first-run", "--disable-features=Translate", "--lang=ru")

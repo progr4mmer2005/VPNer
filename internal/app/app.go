@@ -49,6 +49,9 @@ type App struct {
 	wslReady  bool
 	endpoints map[string]*endpoint
 	vms         map[string]*vmRuntime
+	health      map[string]*nativeHealth
+	foreign     []string
+	monStop     chan struct{}
 	vmEndpoints map[string]engine.LocalEndpoint
 	testPorts map[string]int
 	conns     map[string]*connRuntime
@@ -105,6 +108,7 @@ func New(dataDir string) (*App, error) {
 		ks:        &firewall.KillSwitch{StateDir: dataDir},
 		endpoints: map[string]*endpoint{},
 		vms:         map[string]*vmRuntime{},
+		health:      map[string]*nativeHealth{},
 		vmEndpoints: map[string]engine.LocalEndpoint{},
 		testPorts: map[string]int{},
 		conns:     map[string]*connRuntime{},
@@ -452,7 +456,7 @@ func (a *App) startLocked() error {
 		return err
 	}
 	m := &engine.Mihomo{Bin: bin, WorkDir: a.engineDir(), Port: port, Secret: randHex(16),
-		Logf: func(level, line string) { a.Log.Add("engine", level, trimMihomo(line)) }}
+		Logf: a.engineLog}
 	a.mu.Lock()
 	a.engine = m
 	a.mu.Unlock()
@@ -471,6 +475,12 @@ func (a *App) startLocked() error {
 	v, _ := m.Version()
 	a.Log.Infof("app", "движок mihomo %s запущен", v)
 	go a.watchEngine(m)
+	a.mu.Lock()
+	a.monStop = make(chan struct{})
+	a.health = map[string]*nativeHealth{}
+	stop := a.monStop
+	a.mu.Unlock()
+	go a.monitor(m, stop)
 	if a.Config().Settings.KillSwitch {
 		if err := a.enableKillSwitch(); err != nil {
 			return err
@@ -537,6 +547,11 @@ func (a *App) Stop() error {
 	a.running = false
 	m := a.engine
 	a.engine = nil
+	if a.monStop != nil {
+		close(a.monStop)
+		a.monStop = nil
+	}
+	a.foreign = nil
 	a.mu.Unlock()
 
 	a.stopAllConns()
@@ -621,6 +636,7 @@ func (a *App) genConfig() (map[string]any, error) {
 	if m == nil {
 		return nil, errors.New("движок не запущен")
 	}
+	cfg.Settings.LogLevel = "debug" // filtered in engineLog
 	exe, _ := os.Executable()
 	return engine.Generate(engine.GenInput{
 		Cfg: cfg, Endpoints: eps, ControllerPort: m.Port, Secret: m.Secret,
@@ -665,13 +681,15 @@ type Snapshot struct {
 	Setup       *SetupState `json:"setup,omitempty"`
 	KillSwitch  bool        `json:"killSwitch"`
 	Connections []ConnView  `json:"connections"`
+	// Foreign lists other VPN programs that currently hold the default route.
+	Foreign []string `json:"foreign,omitempty"`
 }
 
 func (a *App) Snapshot() Snapshot {
 	cfg := a.Config()
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	s := Snapshot{Running: a.running, Starting: a.starting, Error: a.lastError, KillSwitch: a.ks.Active()}
+	s := Snapshot{Running: a.running, Starting: a.starting, Error: a.lastError, KillSwitch: a.ks.Active(), Foreign: a.foreign}
 	if a.setup != nil {
 		st := *a.setup
 		s.Setup = &st
@@ -688,7 +706,7 @@ func (a *App) Snapshot() Snapshot {
 			v.State = "disabled"
 		case p != nil && p.Runtime() == providers.RuntimeNative:
 			if a.running {
-				v.State = "ready"
+				v.State, v.Detail = a.nativeStateLocked(c.ID)
 			} else {
 				v.State = "off"
 			}
@@ -772,3 +790,31 @@ func (a *App) ConnName(id string) string {
 }
 
 var _ = bridge.ProtocolVersion
+
+var logRank = map[string]int{"debug": 0, "info": 1, "warning": 2, "error": 3, "fatal": 4}
+
+// engineLog keeps the user's chosen engine log level, plus WireGuard/AmneziaWG
+// handshake diagnostics (logged by the engine only at debug level) so that
+// stalled tunnels can be explained afterwards.
+func (a *App) engineLog(level, line string) {
+	want := a.Config().Settings.LogLevel
+	if want == "" {
+		want = "info"
+	}
+	if logRank[level] < logRank[want] {
+		if !strings.Contains(line, "[WG]") {
+			return
+		}
+		keep := false
+		for _, k := range []string{"andshake", "Keypair", "giving up", "rror", "Retrying", "retrying"} {
+			if strings.Contains(line, k) {
+				keep = true
+				break
+			}
+		}
+		if !keep {
+			return
+		}
+	}
+	a.Log.Add("engine", level, trimMihomo(line))
+}

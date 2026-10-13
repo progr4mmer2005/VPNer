@@ -447,6 +447,7 @@ function renderHeader() {
   $("#cnt-rules").textContent = (S.cfg && S.cfg.rules && S.cfg.rules.length) || "";
   let b = "";
   if (st.error) b += `<div class="banner bad"><b>Ошибка:</b> ${esc(st.error)}</div>`;
+  if (st.running && st.foreign && st.foreign.length) b += `<div class="banner warn"><span>Одновременно с VPNer подключён другой VPN: <b>${esc(st.foreign.join(", "))}</b>. Он перехватывает трафик и мешает подключениям VPNer (сайты могут не открываться или тормозить) — отключите его.</span></div>`;
   if (st.setup) {
     const pct = st.setup.total > 0 ? Math.round(st.setup.done * 100 / st.setup.total) : 0;
     b += `<div class="banner info"><div class="grow">${esc(st.setup.stage)}${st.setup.total > 0 ? ` — ${fmtBytes(st.setup.done)} из ${fmtBytes(st.setup.total)}` : ""}<div class="progress ${st.setup.total > 0 ? "" : "indet"}"><div style="width:${pct}%"></div></div></div></div>`;

@@ -50,6 +50,7 @@ type App struct {
 	endpoints map[string]*endpoint
 	vms         map[string]*vmRuntime
 	health      map[string]*nativeHealth
+	quitAsk     bool // the user asked to quit while VPNs were running
 	foreign     []string
 	monStop     chan struct{}
 	vmEndpoints map[string]engine.LocalEndpoint
@@ -229,16 +230,33 @@ func (a *App) SaveConnection(c config.Connection) (string, error) {
 	}
 	if c.ID == "" {
 		c.ID = config.NewID("c")
+		if err := a.provisionAmnezia(&c); err != nil {
+			return "", err
+		}
 		cfg.Connections = append(cfg.Connections, c)
 	} else {
 		old := cfg.Conn(c.ID)
 		if old == nil {
 			return "", fmt.Errorf("подключение %s не найдено", c.ID)
 		}
+		keyChanged := c.Type == "amnezia-server" && c.Secrets["key"] != "" && c.Secrets["key"] != old.Secrets["key"]
 		for k, v := range old.Secrets {
 			if _, ok := c.Secrets[k]; !ok {
 				c.Secrets[k] = v
 			}
+		}
+		for _, k := range []string{"clientId", "clientIp", "hostKey"} {
+			if _, ok := c.Params[k]; !ok && old.Params[k] != "" {
+				c.Params[k] = old.Params[k]
+			}
+		}
+		if keyChanged {
+			delete(c.Secrets, "config")
+			delete(c.Params, "clientId")
+			delete(c.Params, "hostKey")
+		}
+		if err := a.provisionAmnezia(&c); err != nil {
+			return "", err
 		}
 		*old = c
 	}
@@ -260,6 +278,7 @@ func (a *App) DeleteConnection(id string) error {
 	for _, c := range cfg.Connections {
 		if c.ID == id {
 			name = c.Name
+			go a.removeAmneziaClient(c)
 			continue
 		}
 		out = append(out, c)
@@ -683,13 +702,15 @@ type Snapshot struct {
 	Connections []ConnView  `json:"connections"`
 	// Foreign lists other VPN programs that currently hold the default route.
 	Foreign []string `json:"foreign,omitempty"`
+	// QuitAsk: the user chose "Выход" while VPNs are on — confirm in the UI.
+	QuitAsk bool `json:"quitAsk,omitempty"`
 }
 
 func (a *App) Snapshot() Snapshot {
 	cfg := a.Config()
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	s := Snapshot{Running: a.running, Starting: a.starting, Error: a.lastError, KillSwitch: a.ks.Active(), Foreign: a.foreign}
+	s := Snapshot{Running: a.running, Starting: a.starting, Error: a.lastError, KillSwitch: a.ks.Active(), Foreign: a.foreign, QuitAsk: a.quitAsk}
 	if a.setup != nil {
 		st := *a.setup
 		s.Setup = &st

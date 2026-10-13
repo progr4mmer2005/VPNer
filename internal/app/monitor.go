@@ -19,7 +19,7 @@ type nativeHealth struct {
 
 const (
 	probeURL      = "http://cp.cloudflare.com/generate_204"
-	probeInterval = 20 * time.Second
+	probeInterval = 10 * time.Second
 	probeTimeout  = 6 * time.Second
 	recoverAfter  = 2               // consecutive failed probes
 	recoverPause  = 2 * time.Minute // between forced reconnects of one connection

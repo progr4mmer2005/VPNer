@@ -430,7 +430,7 @@ func decodeAmneziaKey(key string) (conf, desc string, err error) {
 	walk(root)
 	if found == "" {
 		if _, ok := rootMap["userName"]; ok {
-			return "", desc, errors.New("это ключ полного доступа к серверу — он не нужен и небезопасен. В AmneziaVPN выберите «Поделиться» → протокол AmneziaWG и импортируйте обычный ключ подключения")
+			return "", desc, errors.New("это ключ полного доступа к серверу — выберите тип «Amnezia — ключ полного доступа»")
 		}
 		return "", desc, errors.New("в ключе vpn:// не найден конфиг WireGuard/AmneziaWG (протоколы OpenVPN/Cloak пока не поддерживаются; XRay экспортируйте ссылкой vless://)")
 	}

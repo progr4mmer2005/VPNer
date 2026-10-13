@@ -425,6 +425,7 @@ function onState(prev) {
   const needCfg = !prev || (prev.connections || []).length !== (S.state.connections || []).length;
   if (needCfg) loadConfig().then(() => { if (["conns", "rules"].includes(S.tab)) render(); });
   else if (S.tab === "conns" || S.tab === "check") render();
+  if (S.state.quitAsk) showQuitConfirm();
   const p = (S.state.connections || []).find(c => c.prompt);
   if (p && promptOpen !== p.id + p.prompt.text) showPrompt(p);
 }
@@ -459,11 +460,28 @@ $("#power").onclick = async () => {
   if (S.state && (S.state.running || S.state.starting)) await act(() => api("POST", "/api/stop"));
   else await act(() => api("POST", "/api/start"));
 };
-$("#quit").onclick = async () => {
-  if (!confirm("Выйти из VPNer? Маршрутизация будет выключена, сеть вернётся в обычный режим.")) return;
-  await api("POST", "/api/quit").catch(() => {});
-  document.body.innerHTML = '<div style="padding:40px;font:16px Segoe UI">VPNer закрыт. Окно можно закрыть.</div>';
+$("#quit").onclick = () => {
+  if (S.state && (S.state.running || S.state.starting)) showQuitConfirm();
+  else doQuit();
 };
+async function doQuit() {
+  await api("POST", "/api/quit").catch(() => {});
+  document.body.innerHTML = '<div style="padding:40px;font:16px Segoe UI;color:#8b949e">VPNer закрыт.</div>';
+}
+let quitShown = false;
+function showQuitConfirm() {
+  if (quitShown) return;
+  quitShown = true;
+  const active = ((S.state && S.state.connections) || []).filter(c => ["up", "ready", "starting", "auth", "confirm", "provisioning", "novpn"].includes(c.state));
+  const list = active.map(c => `<li>${esc(c.name)}</li>`).join("");
+  const m = modal(`<header><h3>Выйти из VPNer?</h3></header>
+    <div class="body"><p style="margin-top:0">Сейчас работают VPN-подключения${active.length ? ":" : "."}</p>${list ? `<ul style="margin:0 0 12px;padding-left:20px">${list}</ul>` : ""}
+    <p style="color:var(--muted);margin-bottom:0">При выходе все подключения будут отключены, а сеть вернётся в обычный режим.</p></div>
+    <footer><button class="btn" id="q-stay">Не выходить</button><button class="btn primary" id="q-go">Отключиться и выйти</button></footer>`, { sticky: true });
+  const close = () => { quitShown = false; closeModal(); };
+  $("#q-stay", m).onclick = async () => { close(); await api("POST", "/api/quit/cancel").catch(() => {}); };
+  $("#q-go", m).onclick = async () => { $("#q-go", m).disabled = true; $("#q-go", m).textContent = "Отключаю…"; await doQuit(); };
+}
 async function restoreNet() { await act(() => api("POST", "/api/restore"), "Сеть восстановлена"); }
 
 // ---------- tabs ----------
@@ -1052,7 +1070,7 @@ async function renderSettings() {
     <div class="panel"><h3>DNS</h3><p class="help" style="color:var(--muted);font-size:12.5px;margin:0">Серверы (DoH, DoT, DoQ…), правила для доменов и режим — на вкладке <a href="#" onclick="setTab('dns');return false">DNS</a>.</p></div>
     <div class="panel"><h3>Запуск</h3>
       ${chk("autostart", "Запускать вместе с Windows", "Программа стартует свёрнутой в трей при входе в систему, без запроса UAC.")}
-      ${chk("startOnLaunch", "Включать маршрутизацию при запуске программы", "")}
+      ${chk("startOnLaunch", "Включать маршрутизацию при запуске программы", "Если выключено, программа после запуска ничего не включает, пока вы не нажмёте «Включить».")}
       <div class="field"><span>Сетевой стек TUN</span><select id="s-stack">${["mixed", "system", "gvisor"].map(v => `<option ${v === s.tunStack ? "selected" : ""}>${v}</option>`).join("")}</select><span class="help">mixed — рекомендуется. gvisor — если с mixed что-то не работает.</span></div>
       ${chk("noTun", "Без перехвата трафика (только локальные прокси)", "Отладочный режим: программы направляются вручную через «Локальный прокси» каждого подключения.")}
       <div class="field"><span>Подробность журнала движка</span><select id="s-log">${["error", "warning", "info", "debug"].map(v => `<option ${v === s.logLevel ? "selected" : ""}>${v}</option>`).join("")}</select></div>

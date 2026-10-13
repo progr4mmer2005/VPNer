@@ -324,11 +324,16 @@ func (s *Server) routes(mux *http.ServeMux) {
 		}
 		writeJSON(w, map[string]bool{"ok": true})
 	})
+	// Quit for real (the user confirmed, or nothing was running).
 	mux.HandleFunc("POST /api/quit", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]bool{"ok": true})
 		if s.OnQuit != nil {
 			go s.OnQuit()
 		}
+	})
+	mux.HandleFunc("POST /api/quit/cancel", func(w http.ResponseWriter, r *http.Request) {
+		s.App.CancelQuit()
+		writeJSON(w, map[string]bool{"ok": true})
 	})
 
 	mux.HandleFunc("GET /api/live", func(w http.ResponseWriter, r *http.Request) {

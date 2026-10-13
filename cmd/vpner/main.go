@@ -135,6 +135,7 @@ func main() {
 		quitOnce.Do(func() {
 			a.Log.Infof("app", "выход")
 			a.Shutdown()
+			winutil.CloseAppWindows(winutil.AppWindowTitle)
 			srv.Close()
 			os.Remove(uiFile)
 			systray.Quit()
@@ -220,6 +221,11 @@ func main() {
 				case <-mRestore.ClickedCh:
 					go a.EmergencyRestore()
 				case <-mQuit.ClickedCh:
+					// With VPNs on, confirm in the window first.
+					if a.AskQuit() {
+						openUI()
+						continue
+					}
 					quit()
 					return
 				}

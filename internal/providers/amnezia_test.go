@@ -88,11 +88,26 @@ func TestAmneziaTemplateKey(t *testing.T) {
 	}
 }
 
-func TestAmneziaFullAccessKeyRejected(t *testing.T) {
-	key := amneziaKey(t, map[string]any{"containers": []any{}, "hostName": "5.6.7.8", "userName": "root", "password": "x", "port": 22})
-	_, err := Import("full.vpn", key)
-	if err == nil || !strings.Contains(err.Error(), "полного доступа") {
-		t.Errorf("full-access key should be refused with a clear message, got %v", err)
+func TestAmneziaFullAccessKey(t *testing.T) {
+	key := amneziaKey(t, map[string]any{
+		"containers": []any{map[string]any{"container": "amnezia-awg2", "awg": map[string]any{"port": "30591", "Jc": "6"}}},
+		"defaultContainer": "amnezia-awg2", "description": "Мой сервер",
+		"hostName": "5.6.7.8", "userName": "root", "password": "x", "port": 22,
+	})
+	c, err := Import("full.vpn", key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Type != "amnezia-server" || c.S("key") == "" || c.Name != "Мой сервер" {
+		t.Errorf("type=%s name=%q", c.Type, c.Name)
+	}
+	// not provisioned yet: a clear error instead of a broken outbound
+	if _, err := (amneziaServerProvider{}).Outbound(c); err == nil || !strings.Contains(err.Error(), "ещё не создан") {
+		t.Errorf("expected 'not provisioned' error, got %v", err)
+	}
+	noAWG := amneziaKey(t, map[string]any{"containers": []any{}, "hostName": "5.6.7.8", "userName": "root", "password": "x"})
+	if _, err := Import("x.vpn", noAWG); err == nil || !strings.Contains(err.Error(), "AmneziaWG") {
+		t.Errorf("server without AmneziaWG must give a clear error, got %v", err)
 	}
 	_ = config.TargetDirect
 }

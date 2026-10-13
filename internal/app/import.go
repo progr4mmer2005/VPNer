@@ -36,6 +36,11 @@ func (a *App) ImportData(filename, data string, dry bool, opt ImportOptions) (*I
 	if dry {
 		return out, nil
 	}
+	for i := range res.Connections {
+		if err := a.provisionAmnezia(&res.Connections[i]); err != nil {
+			return nil, err
+		}
+	}
 	a.ops.Lock()
 	defer a.ops.Unlock()
 	cfg := a.Config()

@@ -111,9 +111,13 @@ func sendHook(m hookMsg) error {
 	return nil
 }
 
-func loadHookState() hookState {
+func loadHookState(id string) hookState {
 	var hs hookState
-	if b, err := os.ReadFile(filepath.Join(os.Getenv("VPNER_DIR"), "hook.json")); err == nil {
+	dir := os.Getenv("VPNER_DIR")
+	if dir == "" {
+		dir = filepath.Join(runRoot, id) // daemons may strip the environment
+	}
+	if b, err := os.ReadFile(filepath.Join(dir, "hook.json")); err == nil {
 		json.Unmarshal(b, &hs)
 	}
 	return hs
@@ -134,6 +138,12 @@ func hookLog(id, line string) {
 
 // Hook is the entry point for "vpner-agent hook <kind> <id> [args...]".
 func Hook(kind, id string, args []string) error {
+	// OpenVPN runs scripts with a minimal environment that has no PATH, so
+	// commands like "ip" would not be found and routes would silently be
+	// missing. Always provide the standard system path.
+	if !strings.Contains(os.Getenv("PATH"), "/sbin") {
+		os.Setenv("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin")
+	}
 	switch kind {
 	case "vpnc":
 		return hookVPNC(id)
@@ -165,7 +175,7 @@ func hookVPNC(id string) error {
 	default:
 		return nil
 	}
-	hs := loadHookState()
+	hs := loadHookState(id)
 	tun := os.Getenv("TUNDEV")
 	addr := os.Getenv("INTERNAL_IP4_ADDRESS")
 	if tun == "" || addr == "" {
@@ -216,7 +226,7 @@ var dhcpDNSRe = regexp.MustCompile(`(?i)^dhcp-option\s+DNS\s+(\S+)`)
 
 // hookOVPNUp runs as OpenVPN's --route-up script inside the namespace.
 func hookOVPNUp(id string) error {
-	hs := loadHookState()
+	hs := loadHookState(id)
 	tun := os.Getenv("dev")
 	addr := os.Getenv("ifconfig_local")
 	var dns []string

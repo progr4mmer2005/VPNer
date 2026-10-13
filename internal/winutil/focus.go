@@ -79,3 +79,13 @@ func FocusAppWindow(title string) bool {
 
 // CountAppWindows is used to verify that no duplicate windows are opened.
 func CountAppWindows(title string) int { return len(findAppWindows(title)) }
+
+var procPostMessageW = user32.NewProc("PostMessageW")
+
+// CloseAppWindows closes the UI windows (when the program exits).
+func CloseAppWindows(title string) {
+	const wmClose = 0x0010
+	for _, h := range findAppWindows(title) {
+		procPostMessageW.Call(h, wmClose, 0, 0)
+	}
+}

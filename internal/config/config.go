@@ -15,7 +15,9 @@ import (
 	"sync"
 )
 
-const CurrentVersion = 1
+// CurrentVersion 2: routing is no longer switched on automatically at launch
+// unless the user enables that setting.
+const CurrentVersion = 2
 
 // Special rule targets.
 const (
@@ -106,7 +108,8 @@ type Settings struct {
 	BlockQUIC bool `json:"blockQuic"`
 	// TunStack: mixed|system|gvisor.
 	TunStack string `json:"tunStack"`
-	// StartOnLaunch starts routing when the app starts.
+	// StartOnLaunch starts routing when the app starts (off by default: the
+	// program does nothing until the user presses "Включить").
 	StartOnLaunch bool `json:"startOnLaunch"`
 	// Autostart launches VPNer at Windows logon (scheduled task, elevated).
 	Autostart bool `json:"autostart"`
@@ -129,7 +132,7 @@ func Default() *Config {
 			KillSwitch:    false,
 			AllowLAN:      true,
 			TunStack:      "mixed",
-			StartOnLaunch: true,
+			StartOnLaunch: false,
 			LogLevel:      "info",
 		},
 	}
@@ -237,6 +240,10 @@ func (s *Store) Load() (*Config, error) {
 		cfg.Rules = []Rule{}
 	}
 	migrateDNS(cfg)
+	if cfg.Version < 2 {
+		cfg.Settings.StartOnLaunch = false // was on by default before
+		cfg.Version = 2
+	}
 	return cfg, nil
 }
 

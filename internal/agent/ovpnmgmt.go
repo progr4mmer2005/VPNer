@@ -63,10 +63,12 @@ func (c *conn) runOpenVPNMgmt(cmd *exec.Cmd) {
 	}
 	passRejected := false
 	var crvState, crvUser, crvResponse string
+	var authSentAt time.Time
 
 	sendAuth := func(typ, u, p string) {
 		send("username " + mgmtQuote(typ) + " " + mgmtQuote(u))
 		send("password " + mgmtQuote(typ) + " " + mgmtQuote(p))
+		authSentAt = time.Now()
 		c.afterCredentials()
 	}
 	mfa := ""
@@ -115,6 +117,12 @@ func (c *conn) runOpenVPNMgmt(cmd *exec.Cmd) {
 			echo := strings.Contains(m[2], "E")
 			c.askUser(m[5], !echo, func(r string) { crvResponse = strings.TrimSpace(r) })
 		case failRe.MatchString(line):
+			if crvState == "" && c.retryAfterSlowFailure(authSentAt) {
+				// the server waited for a confirmation that did not come
+				c.log("вход не был подтверждён — повторяю с сохранённым паролем")
+				authSentAt = time.Time{}
+				break
+			}
 			c.log("OpenVPN: сервер отклонил логин/пароль или код")
 			passRejected = true
 			c.mu.Lock()

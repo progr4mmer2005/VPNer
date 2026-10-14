@@ -20,8 +20,8 @@ type nativeHealth struct {
 const (
 	probeURL      = "http://cp.cloudflare.com/generate_204"
 	probeInterval = 10 * time.Second
-	probeTimeout  = 6 * time.Second
-	recoverAfter  = 2               // consecutive failed probes
+	probeTimeout  = 8 * time.Second
+	recoverAfter  = 3               // consecutive failed probes
 	recoverPause  = 2 * time.Minute // between forced reconnects of one connection
 )
 
@@ -60,6 +60,7 @@ func (a *App) checkForeign() {
 func (a *App) probeNative(m *engine.Mihomo) {
 	cfg := a.Config()
 	needRecover := []string{}
+	tunnels := false
 	for _, c := range cfg.Connections {
 		if !c.Enabled {
 			continue
@@ -96,16 +97,26 @@ func (a *App) probeNative(m *engine.Mihomo) {
 		if h.fails >= recoverAfter && time.Since(h.lastRecover) > recoverPause {
 			h.lastRecover = time.Now()
 			needRecover = append(needRecover, c.Name)
+			if a.tun != nil && a.tun.ids[c.ID] {
+				tunnels = true
+			}
 		}
 		a.mu.Unlock()
 	}
-	if len(needRecover) > 0 {
-		// Reloading recreates the outbounds: a fresh handshake from a new UDP
-		// port, which clears stalled sessions and per-flow throttling.
-		a.Log.Warnf("app", "переподключаю: %s", strings.Join(needRecover, ", "))
-		if err := m.Reload(); err != nil {
-			a.Log.Errorf("app", "переподключение: %v", err)
-		}
+	if len(needRecover) == 0 {
+		return
+	}
+	a.Log.Warnf("app", "переподключаю: %s", strings.Join(needRecover, ", "))
+	var err error
+	if tunnels {
+		// A new tunnel process: fresh handshakes from new UDP ports, and
+		// nothing of the stalled session survives.
+		err = a.restartTunnels()
+	} else {
+		err = m.Reload()
+	}
+	if err != nil {
+		a.Log.Errorf("app", "переподключение: %v", err)
 	}
 }
 

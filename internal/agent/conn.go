@@ -40,6 +40,10 @@ type conn struct {
 	confirmGen int // invalidates pending "waiting for confirmation" timers
 	stopped    bool
 	answered   map[int]bool
+	answeredAt map[int]time.Time
+	// slowRetries counts logins repeated with saved credentials after the
+	// server waited for a confirmation that did not come (reset once up).
+	slowRetries int
 
 	resolver  *tunnelResolver
 	upRe      *regexp.Regexp
@@ -73,7 +77,7 @@ func (a *Agent) startConn(spec bridge.ProcSpec) error {
 		old.stop()
 		a.mu.Lock()
 	}
-	c := &conn{a: a, spec: spec, dir: filepath.Join(runRoot, spec.ID), done: make(chan struct{}), answered: map[int]bool{}}
+	c := &conn{a: a, spec: spec, dir: filepath.Join(runRoot, spec.ID), done: make(chan struct{}), answered: map[int]bool{}, answeredAt: map[int]time.Time{}}
 	c.status = bridge.ConnStatus{ID: spec.ID, State: "starting", Since: time.Now().Unix()}
 	c.resolver = newTunnelResolver(spec.ID, c.dnsServers)
 	if spec.UpPattern != "" {
@@ -115,7 +119,50 @@ func (a *Agent) startConn(spec bridge.ProcSpec) error {
 		return err
 	}
 	go c.supervise()
+	if spec.KeepAlive > 0 {
+		go c.keepAlive(time.Duration(spec.KeepAlive) * time.Second)
+	}
 	return nil
+}
+
+// keepAlive sends a tiny DNS query through the tunnel now and then, so the
+// server does not end the session as idle.
+func (c *conn) keepAlive(every time.Duration) {
+	t := time.NewTicker(every)
+	defer t.Stop()
+	for {
+		select {
+		case <-c.done:
+			return
+		case <-t.C:
+		}
+		if c.State() != "up" {
+			continue
+		}
+		if dns := c.dnsServers(); len(dns) > 0 {
+			c.resolver.query(dns[0], "www.msftncsi.com")
+		}
+	}
+}
+
+const (
+	// A login that fails this long after the credentials went out was held
+	// for a confirmation (push) that did not come; a wrong password is
+	// rejected at once.
+	slowFailure    = 4 * time.Second
+	maxSlowRetries = 2
+)
+
+// retryAfterSlowFailure decides whether saved credentials may be sent again
+// after a login attempt sent at sentAt failed.
+func (c *conn) retryAfterSlowFailure(sentAt time.Time) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if sentAt.IsZero() || time.Since(sentAt) < slowFailure || c.slowRetries >= maxSlowRetries {
+		return false
+	}
+	c.slowRetries++
+	return true
 }
 
 func (c *conn) prepare() error {
@@ -228,6 +275,7 @@ func (c *conn) supervise() {
 		c.mu.Lock()
 		stopped = c.stopped
 		c.answered = map[int]bool{}
+		c.answeredAt = map[int]time.Time{}
 		c.mu.Unlock()
 		if stopped {
 			c.setState("stopped", "")
@@ -360,14 +408,22 @@ func (c *conn) onPrompt(p string) {
 	c.log(p)
 	c.mu.Lock()
 	for i, ans := range c.spec.Answers {
-		if ans.Once && c.answered[i] {
-			continue
-		}
 		re, err := regexp.Compile(ans.Pattern)
 		if err != nil || !re.MatchString(p) {
 			continue
 		}
+		if ans.Once && c.answered[i] {
+			sentAt := c.answeredAt[i]
+			c.mu.Unlock()
+			if !ans.Retry || !c.retryAfterSlowFailure(sentAt) {
+				c.mu.Lock()
+				continue
+			}
+			c.log("вход не был подтверждён — повторяю с сохранённым паролем")
+			c.mu.Lock()
+		}
 		c.answered[i] = true
+		c.answeredAt[i] = time.Now()
 		w := c.stdin
 		c.mu.Unlock()
 		if w != nil {
@@ -426,6 +482,9 @@ func (c *conn) askUser(prompt string, secret bool, hook func(string)) {
 
 func (c *conn) answer(text string) error {
 	c.mu.Lock()
+	// The user answered in person: a later failure must not be retried with
+	// the saved password in place of what the user typed.
+	c.answeredAt = map[int]time.Time{}
 	if h := c.answerHook; h != nil {
 		c.answerHook = nil
 		c.mu.Unlock()
@@ -526,6 +585,7 @@ func (c *conn) reportUp(tun, ip string, dns []string) {
 
 func (c *conn) setUp(tun, ip string, dns []string) {
 	c.mu.Lock()
+	c.slowRetries = 0
 	c.status.State = "up"
 	c.status.Since = time.Now().Unix()
 	c.status.Detail = "туннель поднят"

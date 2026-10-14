@@ -45,6 +45,8 @@ type App struct {
 	lastError string
 	setup     *SetupState
 	engine    *engine.Mihomo
+	tun       *tunnelProc // WireGuard/AmneziaWG tunnels, see tunnels.go
+	tunMu     sync.Mutex  // serialises syncTunnels
 	wsl       *wslhost.Session
 	wslReady  bool
 	endpoints map[string]*endpoint
@@ -57,6 +59,9 @@ type App struct {
 	testPorts map[string]int
 	conns     map[string]*connRuntime
 	ssoFwd    net.Listener
+	// typedPass holds a password the user typed at a prompt; it is saved
+	// into the connection once the tunnel comes up with it.
+	typedPass map[string]string
 
 	changed chan struct{} // signals UI that the snapshot changed
 	subMu   sync.Mutex
@@ -113,6 +118,7 @@ func New(dataDir string) (*App, error) {
 		vmEndpoints: map[string]engine.LocalEndpoint{},
 		testPorts: map[string]int{},
 		conns:     map[string]*connRuntime{},
+		typedPass: map[string]string{},
 		subs:      map[chan struct{}]struct{}{},
 	}
 	cfg, err := a.store.Load()
@@ -447,17 +453,47 @@ func (a *App) Start() error {
 		return err
 	}
 	a.Log.Infof("app", "маршрутизация включена")
-	// autostart connections
+	// Autostart connections one after another: corporate VPNs often confirm
+	// logins through the same push service, and two simultaneous requests
+	// make one of them fail.
+	var ids []string
 	for _, c := range a.Config().Connections {
 		if c.Enabled && c.Autostart && needsRuntime(c.Type) {
-			go func(id string) {
-				if err := a.Connect(id); err != nil {
-					a.Log.Errorf(id, "автоподключение: %v", err)
-				}
-			}(c.ID)
+			ids = append(ids, c.ID)
 		}
 	}
+	go func() {
+		for _, id := range ids {
+			if !a.Running() {
+				return
+			}
+			if err := a.Connect(id); err != nil {
+				a.Log.Errorf(id, "автоподключение: %v", err)
+				continue
+			}
+			a.waitLogin(id, 3*time.Minute)
+		}
+	}()
 	return nil
+}
+
+// waitLogin waits while a connection is still logging in (starting, asking
+// for input or waiting for a confirmation).
+func (a *App) waitLogin(id string, max time.Duration) {
+	deadline := time.Now().Add(max)
+	time.Sleep(time.Second)
+	for time.Now().Before(deadline) && a.Running() {
+		a.mu.Lock()
+		st := ""
+		if rt := a.conns[id]; rt != nil {
+			st = rt.State
+		}
+		a.mu.Unlock()
+		if st != "starting" && st != "auth" && st != "confirm" {
+			return
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
 }
 
 func needsRuntime(t string) bool {
@@ -470,6 +506,9 @@ func (a *App) startLocked() error {
 	if err != nil {
 		return err
 	}
+	if n := engine.KillStray(bin); n > 0 {
+		a.Log.Warnf("app", "завершено %d зависших процессов движка от прошлого запуска", n)
+	}
 	port, err := freePort()
 	if err != nil {
 		return err
@@ -479,6 +518,10 @@ func (a *App) startLocked() error {
 	a.mu.Lock()
 	a.engine = m
 	a.mu.Unlock()
+	a.progress("Запуск туннелей", 0, -1)
+	if err := a.syncTunnels(false); err != nil {
+		a.Log.Errorf("app", "процесс туннелей: %v — туннели будут работать внутри движка", err)
+	}
 	conf, err := a.genConfig()
 	if err != nil {
 		return err
@@ -577,6 +620,7 @@ func (a *App) Stop() error {
 	if m != nil {
 		m.Stop()
 	}
+	a.stopTunnels()
 	var errs []error
 	if a.ks.Active() {
 		if err := a.ks.Disable(); err != nil {
@@ -584,6 +628,9 @@ func (a *App) Stop() error {
 		}
 	}
 	a.closeWSL()
+	// Programs may still hold engine (fake) addresses in the DNS cache;
+	// without the engine those lead nowhere.
+	winutil.FlushDNS()
 	if wasRunning {
 		a.Log.Infof("app", "маршрутизация выключена, сеть в обычном режиме")
 	}
@@ -607,6 +654,9 @@ func (a *App) applyEngine() error {
 	a.mu.Unlock()
 	if m == nil || !running {
 		return nil
+	}
+	if err := a.syncTunnels(false); err != nil {
+		a.Log.Errorf("app", "процесс туннелей: %v", err)
 	}
 	conf, err := a.genConfig()
 	if err != nil {
@@ -639,6 +689,9 @@ func (a *App) genConfig() (map[string]any, error) {
 	for id, ep := range a.vmEndpoints {
 		eps[id] = ep
 	}
+	for id, ep := range a.tunnelEndpointsLocked() {
+		eps[id] = ep
+	}
 	tp := map[string]int{}
 	for _, c := range cfg.Connections {
 		if !c.Enabled {
@@ -661,6 +714,7 @@ func (a *App) genConfig() (map[string]any, error) {
 		Cfg: cfg, Endpoints: eps, ControllerPort: m.Port, Secret: m.Secret,
 		LoopbackIface: loopbackIface(), TestPorts: tp,
 		SelfProcesses: []string{filepath.Base(exe), "mihomo.exe"},
+		NoIPv6:        !hasIPv6(),
 	})
 }
 

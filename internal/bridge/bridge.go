@@ -103,6 +103,10 @@ type ProcSpec struct {
 	// (e.g. OpenVPN AUTH_PENDING): show "waiting for confirmation" at once.
 	PendingPattern string `json:"pendingPattern,omitempty"`
 	Creds       *Creds `json:"creds,omitempty"`
+	// KeepAlive, when > 0, sends a tiny DNS query through the tunnel every
+	// that many seconds, so servers do not end an idle session (each new
+	// session would need the login confirmed again).
+	KeepAlive int `json:"keepAlive,omitempty"`
 }
 
 // Creds are saved credentials the agent may use without asking the user.
@@ -124,6 +128,10 @@ type Answer struct {
 	Pattern string `json:"pattern"` // Go regexp matched against the prompt text
 	Value   string `json:"value"`
 	Once    bool   `json:"once"`
+	// Retry allows sending a Once answer again when the previous login
+	// attempt failed only after a long wait: the server was waiting for a
+	// confirmation (push) that did not come, the password itself was fine.
+	Retry bool `json:"retry,omitempty"`
 }
 
 type ExecParams struct {

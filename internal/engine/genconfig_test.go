@@ -8,6 +8,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"vpner/internal/config"
+	"vpner/internal/providers"
 )
 
 func testConfig() *config.Config {
@@ -97,5 +98,67 @@ func TestMihomoAccepts(t *testing.T) {
 	if err := mh.Test(m); err != nil {
 		b, _ := yaml.Marshal(m["dns"])
 		t.Fatalf("%v\n%s", err, b)
+	}
+}
+
+const testWG = `[Interface]
+PrivateKey = yAnz5TF+lXXJte14tji3zlMNq+hd2rYUIgJBgB3fBmk=
+Address = 10.8.0.2/32
+DNS = 1.1.1.1
+
+[Peer]
+PublicKey = xTIBA5rboUvnH4htodjb6e697QjLERt1NAB4mZqp8Dg=
+Endpoint = 203.0.113.5:51820
+AllowedIPs = 0.0.0.0/0
+`
+
+// A WireGuard connection with an endpoint runs in the tunnel process: the
+// routing engine reaches it over SOCKS5 and holds no WireGuard device.
+func TestTunnelSplit(t *testing.T) {
+	cfg := testConfig()
+	cfg.Connections = append(cfg.Connections, config.Connection{ID: "cwg", Name: "WG", Type: "wireguard", Enabled: true,
+		Params: map[string]string{}, Secrets: map[string]string{"config": testWG}})
+	cfg.Rules = append(cfg.Rules, config.Rule{Enabled: true, Kind: config.RuleDomainSuffix, Values: []string{"example.org"}, Target: "cwg"})
+	ep := LocalEndpoint{Port: 30002, User: "u", Pass: "p"}
+	m, err := Generate(GenInput{Cfg: cfg, ControllerPort: 9090, Secret: "s", NoIPv6: true,
+		Endpoints: map[string]LocalEndpoint{"cwork": {Port: 30001, User: "u", Pass: "p"}, "cwg": ep}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range m["proxies"].([]map[string]any) {
+		switch p["name"] {
+		case "cwg":
+			if p["type"] != "socks5" || p["port"] != 30002 {
+				t.Errorf("tunnel connection must be reached over SOCKS5: %v", p)
+			}
+		case proxyDirect:
+			if p["ip-version"] != "ipv4" {
+				t.Errorf("without IPv6 direct must be IPv4 only: %v", p)
+			}
+		}
+	}
+	wg, _ := providers.Get("wireguard")
+	out, err := wg.(providers.NativeProvider).Outbound(cfg.Conn("cwg"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !IsTunnelOutbound(out) {
+		t.Fatal("wireguard must go to the tunnel process")
+	}
+	tc := GenerateTunnels(TunnelInput{Outbounds: map[string]map[string]any{"cwg": out},
+		Ports: map[string]int{"cwg": 30002}, User: "u", Pass: "p", ControllerPort: 9091, Secret: "s"})
+	ls := tc["listeners"].([]map[string]any)
+	if len(ls) != 1 || ls[0]["port"] != 30002 || ls[0]["proxy"] != "cwg" {
+		t.Errorf("listeners = %v", ls)
+	}
+	if _, ok := tc["tun"]; ok {
+		t.Error("the tunnel process must not open a TUN")
+	}
+	if bin := os.Getenv("VPNER_MIHOMO"); bin != "" {
+		for _, c := range []map[string]any{m, tc} {
+			if err := (&Mihomo{Bin: bin, WorkDir: t.TempDir()}).Test(c); err != nil {
+				t.Fatal(err)
+			}
+		}
 	}
 }

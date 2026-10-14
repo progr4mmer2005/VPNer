@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net"
 	"os/exec"
+	"regexp"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -146,8 +148,41 @@ func (a *App) Answer(id, text string) error {
 	if s == nil {
 		return errors.New("контейнер не запущен")
 	}
-	a.setConn(id, func(rt *connRuntime) { rt.Prompt = nil })
+	a.setConn(id, func(rt *connRuntime) {
+		if rt.Prompt != nil && rt.Prompt.Secret && passwordPromptRe.MatchString(strings.TrimSpace(rt.Prompt.Text)) {
+			a.typedPass[id] = text
+		}
+		rt.Prompt = nil
+	})
 	return s.Call("conn.answer", bridge.AnswerParams{ID: id, Text: text}, nil)
+}
+
+// passwordPromptRe matches prompts for the account password (not one-time
+// codes or key passphrases), whose answer is worth remembering.
+var passwordPromptRe = regexp.MustCompile(`(?i)^(password|пароль openvpn)\s*:?$`)
+
+// rememberPassword saves a password the user typed once it has worked, so
+// the next login does not ask again.
+func (a *App) rememberPassword(id, pw string) {
+	a.ops.Lock()
+	defer a.ops.Unlock()
+	cfg := a.Config()
+	c := cfg.Conn(id)
+	if c == nil || c.S("password") == pw {
+		return
+	}
+	if c.Secrets == nil {
+		c.Secrets = map[string]string{}
+	}
+	c.Secrets["password"] = pw
+	if err := a.store.Save(cfg); err != nil {
+		a.Log.Errorf(id, "не удалось сохранить пароль: %v", err)
+		return
+	}
+	a.mu.Lock()
+	a.cfg = cfg
+	a.mu.Unlock()
+	a.Log.Infof(id, "введённый пароль подошёл и сохранён — в следующий раз он подставится сам")
 }
 
 // ---- local SOCKS endpoints (mihomo -> vpner -> namespace) ----
@@ -316,6 +351,13 @@ func (a *App) onAgentEvent(ev bridge.Event) {
 		})
 		if st.State == "up" {
 			a.Log.Infof(ev.ID, "туннель поднят: адрес %s, DNS %v", st.IP, st.DNS)
+			a.mu.Lock()
+			pw := a.typedPass[ev.ID]
+			delete(a.typedPass, ev.ID)
+			a.mu.Unlock()
+			if pw != "" {
+				go a.rememberPassword(ev.ID, pw)
+			}
 		}
 	case "prompt":
 		a.setConn(ev.ID, func(rt *connRuntime) {

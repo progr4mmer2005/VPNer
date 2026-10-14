@@ -30,6 +30,9 @@ type Mihomo struct {
 	Port   int
 	Secret string
 
+	// applyMu serialises config writes and reloads: several connections
+	// coming up at once must not write the config file concurrently.
+	applyMu sync.Mutex
 	mu      sync.Mutex
 	cmd     *exec.Cmd
 	exited  chan struct{}
@@ -46,11 +49,22 @@ func (m *Mihomo) writeConfig(conf map[string]any) error {
 	if err := os.MkdirAll(m.WorkDir, 0o700); err != nil {
 		return err
 	}
-	tmp := m.configPath() + ".tmp"
-	if err := os.WriteFile(tmp, b, 0o600); err != nil {
+	f, err := os.CreateTemp(m.WorkDir, "config-*.tmp")
+	if err != nil {
 		return err
 	}
-	return os.Rename(tmp, m.configPath())
+	tmp := f.Name()
+	_, err = f.Write(b)
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	if err == nil {
+		err = os.Rename(tmp, m.configPath())
+	}
+	if err != nil {
+		os.Remove(tmp)
+	}
+	return err
 }
 
 // Test validates a config with "mihomo -t" without applying it.
@@ -60,11 +74,17 @@ func (m *Mihomo) Test(conf map[string]any) error {
 		return err
 	}
 	os.MkdirAll(m.WorkDir, 0o700)
-	p := filepath.Join(m.WorkDir, "config.test.yaml")
-	if err := os.WriteFile(p, b, 0o600); err != nil {
+	f, err := os.CreateTemp(m.WorkDir, "config-test-*.yaml")
+	if err != nil {
 		return err
 	}
+	p := f.Name()
 	defer os.Remove(p)
+	_, err = f.Write(b)
+	f.Close()
+	if err != nil {
+		return err
+	}
 	cmd := exec.Command(m.Bin, "-t", "-d", m.WorkDir, "-f", p)
 	hideWindow(cmd)
 	out, err := cmd.CombinedOutput()
@@ -90,13 +110,28 @@ func (m *Mihomo) Running() bool {
 
 // Start writes the config and launches mihomo, waiting until its API answers.
 func (m *Mihomo) Start(conf map[string]any) error {
+	m.applyMu.Lock()
+	defer m.applyMu.Unlock()
+	return m.startLocked(conf)
+}
+
+// Restart replaces the running process with a fresh one: unlike a reload,
+// nothing of the old process (sessions, keys, sockets) survives.
+func (m *Mihomo) Restart(conf map[string]any) error {
+	m.applyMu.Lock()
+	defer m.applyMu.Unlock()
+	m.Stop()
+	return m.startLocked(conf)
+}
+
+func (m *Mihomo) startLocked(conf map[string]any) error {
 	if err := m.writeConfig(conf); err != nil {
 		return err
 	}
 	m.mu.Lock()
 	if m.cmd != nil {
 		m.mu.Unlock()
-		return m.Reload()
+		return m.reload()
 	}
 	cmd := exec.Command(m.Bin, "-d", m.WorkDir, "-f", m.configPath())
 	hideWindow(cmd)
@@ -173,16 +208,25 @@ func (m *Mihomo) Exited() <-chan struct{} {
 
 // Apply rewrites the config and hot-reloads it (TUN stays up).
 func (m *Mihomo) Apply(conf map[string]any) error {
+	m.applyMu.Lock()
+	defer m.applyMu.Unlock()
 	if !m.Running() {
-		return m.Start(conf)
+		return m.startLocked(conf)
 	}
 	if err := m.writeConfig(conf); err != nil {
 		return err
 	}
-	return m.Reload()
+	return m.reload()
 }
 
+// Reload makes the engine re-read its config file.
 func (m *Mihomo) Reload() error {
+	m.applyMu.Lock()
+	defer m.applyMu.Unlock()
+	return m.reload()
+}
+
+func (m *Mihomo) reload() error {
 	body, _ := json.Marshal(map[string]string{"path": m.configPath()})
 	return m.api(http.MethodPut, "/configs?force=true", body, nil)
 }

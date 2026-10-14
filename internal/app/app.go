@@ -470,6 +470,9 @@ func (a *App) startLocked() error {
 	if err != nil {
 		return err
 	}
+	if n := engine.KillStray(bin); n > 0 {
+		a.Log.Warnf("app", "завершено %d зависших процессов движка от прошлого запуска", n)
+	}
 	port, err := freePort()
 	if err != nil {
 		return err
@@ -584,6 +587,9 @@ func (a *App) Stop() error {
 		}
 	}
 	a.closeWSL()
+	// Programs may still hold engine (fake) addresses in the DNS cache;
+	// without the engine those lead nowhere.
+	winutil.FlushDNS()
 	if wasRunning {
 		a.Log.Infof("app", "маршрутизация выключена, сеть в обычном режиме")
 	}

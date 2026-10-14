@@ -141,6 +141,7 @@ func (m *Mihomo) startLocked(conf map[string]any) error {
 		m.mu.Unlock()
 		return err
 	}
+	tieToUs(cmd.Process)
 	m.cmd = cmd
 	m.exited = make(chan struct{})
 	exited := m.exited

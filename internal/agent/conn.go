@@ -119,7 +119,30 @@ func (a *Agent) startConn(spec bridge.ProcSpec) error {
 		return err
 	}
 	go c.supervise()
+	if spec.KeepAlive > 0 {
+		go c.keepAlive(time.Duration(spec.KeepAlive) * time.Second)
+	}
 	return nil
+}
+
+// keepAlive sends a tiny DNS query through the tunnel now and then, so the
+// server does not end the session as idle.
+func (c *conn) keepAlive(every time.Duration) {
+	t := time.NewTicker(every)
+	defer t.Stop()
+	for {
+		select {
+		case <-c.done:
+			return
+		case <-t.C:
+		}
+		if c.State() != "up" {
+			continue
+		}
+		if dns := c.dnsServers(); len(dns) > 0 {
+			c.resolver.query(dns[0], "www.msftncsi.com")
+		}
+	}
 }
 
 const (

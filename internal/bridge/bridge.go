@@ -103,6 +103,10 @@ type ProcSpec struct {
 	// (e.g. OpenVPN AUTH_PENDING): show "waiting for confirmation" at once.
 	PendingPattern string `json:"pendingPattern,omitempty"`
 	Creds       *Creds `json:"creds,omitempty"`
+	// KeepAlive, when > 0, sends a tiny DNS query through the tunnel every
+	// that many seconds, so servers do not end an idle session (each new
+	// session would need the login confirmed again).
+	KeepAlive int `json:"keepAlive,omitempty"`
 }
 
 // Creds are saved credentials the agent may use without asking the user.

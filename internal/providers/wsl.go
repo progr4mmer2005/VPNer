@@ -55,6 +55,8 @@ func (openconnectProvider) Fields() []Field {
 		fieldRouteAll(),
 		fieldFallbackDNS(),
 		fieldReconnect(),
+		{Key: "keepAlive", Label: "Не давать серверу отключать по простою", Kind: "bool", Default: "true", Advanced: true,
+			Help: "Раз в минуту через туннель уходит крошечный DNS-запрос, и сервер не завершает сессию из-за бездействия — не придётся заново подтверждать вход."},
 		{Key: "extraArgs", Label: "Дополнительные параметры openconnect", Kind: "text", Advanced: true, Placeholder: "--os=win --version-string=..."},
 	}
 }
@@ -125,12 +127,17 @@ func (openconnectProvider) Spec(c *config.Connection) (*bridge.ProcSpec, error) 
 	if pw := c.S("password"); pw != "" {
 		answers = append(answers, bridge.Answer{Pattern: `(?i)^password:?$|пароль`, Value: pw, Once: true, Retry: true})
 	}
+	keepAlive := 0
+	if boolDefault(c, "keepAlive", true) {
+		keepAlive = 60
+	}
 	return &bridge.ProcSpec{
 		ReachedPattern: `Got HTTP response|Connected to HTTPS|SSL negotiation with`,
 		ID:             c.ID, Name: c.Name, Argv: argv, Files: files, Answers: answers,
 		RouteAll:    boolDefault(c, "routeAll", true),
 		FallbackDNS: dnsList(c),
 		Reconnect:   boolDefault(c, "reconnect", true),
+		KeepAlive:   keepAlive,
 	}, nil
 }
 

@@ -123,7 +123,7 @@ func (openconnectProvider) Spec(c *config.Connection) (*bridge.ProcSpec, error) 
 		answers = append(answers, bridge.Answer{Pattern: `(?i)second|secondary|passcode|duo|2fa|mfa|factor|otp|token|response|второй|код`, Value: m, Once: true})
 	}
 	if pw := c.S("password"); pw != "" {
-		answers = append(answers, bridge.Answer{Pattern: `(?i)^password:?$|пароль`, Value: pw, Once: true})
+		answers = append(answers, bridge.Answer{Pattern: `(?i)^password:?$|пароль`, Value: pw, Once: true, Retry: true})
 	}
 	return &bridge.ProcSpec{
 		ReachedPattern: `Got HTTP response|Connected to HTTPS|SSL negotiation with`,

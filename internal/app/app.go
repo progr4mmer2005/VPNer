@@ -45,6 +45,8 @@ type App struct {
 	lastError string
 	setup     *SetupState
 	engine    *engine.Mihomo
+	tun       *tunnelProc // WireGuard/AmneziaWG tunnels, see tunnels.go
+	tunMu     sync.Mutex  // serialises syncTunnels
 	wsl       *wslhost.Session
 	wslReady  bool
 	endpoints map[string]*endpoint
@@ -482,6 +484,10 @@ func (a *App) startLocked() error {
 	a.mu.Lock()
 	a.engine = m
 	a.mu.Unlock()
+	a.progress("Запуск туннелей", 0, -1)
+	if err := a.syncTunnels(false); err != nil {
+		a.Log.Errorf("app", "процесс туннелей: %v — туннели будут работать внутри движка", err)
+	}
 	conf, err := a.genConfig()
 	if err != nil {
 		return err
@@ -580,6 +586,7 @@ func (a *App) Stop() error {
 	if m != nil {
 		m.Stop()
 	}
+	a.stopTunnels()
 	var errs []error
 	if a.ks.Active() {
 		if err := a.ks.Disable(); err != nil {
@@ -614,6 +621,9 @@ func (a *App) applyEngine() error {
 	if m == nil || !running {
 		return nil
 	}
+	if err := a.syncTunnels(false); err != nil {
+		a.Log.Errorf("app", "процесс туннелей: %v", err)
+	}
 	conf, err := a.genConfig()
 	if err != nil {
 		return err
@@ -643,6 +653,9 @@ func (a *App) genConfig() (map[string]any, error) {
 		eps[id] = engine.LocalEndpoint{Port: ep.port, User: ep.user, Pass: ep.pass}
 	}
 	for id, ep := range a.vmEndpoints {
+		eps[id] = ep
+	}
+	for id, ep := range a.tunnelEndpointsLocked() {
 		eps[id] = ep
 	}
 	tp := map[string]int{}

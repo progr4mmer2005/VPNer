@@ -78,15 +78,16 @@ func Generate(in GenInput) (map[string]any, error) {
 			return nil, err
 		}
 		var out map[string]any
-		switch pp := p.(type) {
-		case providers.NativeProvider:
-			out, err = pp.Outbound(c)
+		ep, hasEP := in.Endpoints[c.ID]
+		// A native connection with an endpoint runs in the tunnel process and
+		// is reached over SOCKS5, like WSL and VM connections.
+		if np, ok := p.(providers.NativeProvider); ok && !hasEP {
+			out, err = np.Outbound(c)
 			if err != nil {
 				return nil, fmt.Errorf("%s: %w", c.Name, err)
 			}
-		default:
-			ep, ok := in.Endpoints[c.ID]
-			if !ok {
+		} else {
+			if !hasEP {
 				continue // not running: rules targeting it are rejected below
 			}
 			server := ep.Server
@@ -212,6 +213,62 @@ func Generate(in GenInput) (map[string]any, error) {
 		}
 	}
 	return m, nil
+}
+
+// TunnelInput describes the tunnel process: a separate engine instance that
+// only holds stateful tunnels (WireGuard/AmneziaWG). Rule or DNS changes
+// reload the routing engine but never touch it, so a tunnel is never
+// recreated in place — a reload keeps the old WireGuard device alive until
+// garbage collection, and two devices with one key break each other's
+// session on the server.
+type TunnelInput struct {
+	Outbounds      map[string]map[string]any // connection id -> outbound
+	Ports          map[string]int            // connection id -> SOCKS5 listener port
+	User, Pass     string
+	ControllerPort int
+	Secret         string
+}
+
+// IsTunnelOutbound reports whether an outbound belongs in the tunnel process.
+func IsTunnelOutbound(out map[string]any) bool {
+	return out["type"] == "wireguard"
+}
+
+// GenerateTunnels builds the tunnel process config.
+func GenerateTunnels(in TunnelInput) map[string]any {
+	ids := make([]string, 0, len(in.Outbounds))
+	for id := range in.Outbounds {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	var proxies, listeners []map[string]any
+	for _, id := range ids {
+		out := map[string]any{}
+		for k, v := range in.Outbounds[id] {
+			out[k] = v
+		}
+		out["name"] = id
+		proxies = append(proxies, out)
+		listeners = append(listeners, map[string]any{
+			"name": "in-" + id, "type": "socks", "listen": "127.0.0.1", "port": in.Ports[id],
+			"udp": true, "proxy": id,
+			"users": []map[string]any{{"username": in.User, "password": in.Pass}},
+		})
+	}
+	return map[string]any{
+		"mode":                "rule",
+		"log-level":           "debug", // filtered by VPNer, keeps WireGuard handshake lines
+		"ipv6":                true,
+		"allow-lan":           false,
+		"bind-address":        "127.0.0.1",
+		"external-controller": fmt.Sprintf("127.0.0.1:%d", in.ControllerPort),
+		"secret":              in.Secret,
+		"geo-auto-update":     false,
+		"profile":             map[string]any{"store-selected": false, "store-fake-ip": false},
+		"proxies":             proxies,
+		"listeners":           listeners,
+		"rules":               []string{"MATCH," + proxyReject},
+	}
 }
 
 // ruleLines converts a VPNer rule into mihomo rule lines.

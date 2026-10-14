@@ -59,6 +59,9 @@ type App struct {
 	testPorts map[string]int
 	conns     map[string]*connRuntime
 	ssoFwd    net.Listener
+	// typedPass holds a password the user typed at a prompt; it is saved
+	// into the connection once the tunnel comes up with it.
+	typedPass map[string]string
 
 	changed chan struct{} // signals UI that the snapshot changed
 	subMu   sync.Mutex
@@ -115,6 +118,7 @@ func New(dataDir string) (*App, error) {
 		vmEndpoints: map[string]engine.LocalEndpoint{},
 		testPorts: map[string]int{},
 		conns:     map[string]*connRuntime{},
+		typedPass: map[string]string{},
 		subs:      map[chan struct{}]struct{}{},
 	}
 	cfg, err := a.store.Load()

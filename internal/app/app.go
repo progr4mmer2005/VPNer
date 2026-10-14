@@ -449,17 +449,47 @@ func (a *App) Start() error {
 		return err
 	}
 	a.Log.Infof("app", "маршрутизация включена")
-	// autostart connections
+	// Autostart connections one after another: corporate VPNs often confirm
+	// logins through the same push service, and two simultaneous requests
+	// make one of them fail.
+	var ids []string
 	for _, c := range a.Config().Connections {
 		if c.Enabled && c.Autostart && needsRuntime(c.Type) {
-			go func(id string) {
-				if err := a.Connect(id); err != nil {
-					a.Log.Errorf(id, "автоподключение: %v", err)
-				}
-			}(c.ID)
+			ids = append(ids, c.ID)
 		}
 	}
+	go func() {
+		for _, id := range ids {
+			if !a.Running() {
+				return
+			}
+			if err := a.Connect(id); err != nil {
+				a.Log.Errorf(id, "автоподключение: %v", err)
+				continue
+			}
+			a.waitLogin(id, 3*time.Minute)
+		}
+	}()
 	return nil
+}
+
+// waitLogin waits while a connection is still logging in (starting, asking
+// for input or waiting for a confirmation).
+func (a *App) waitLogin(id string, max time.Duration) {
+	deadline := time.Now().Add(max)
+	time.Sleep(time.Second)
+	for time.Now().Before(deadline) && a.Running() {
+		a.mu.Lock()
+		st := ""
+		if rt := a.conns[id]; rt != nil {
+			st = rt.State
+		}
+		a.mu.Unlock()
+		if st != "starting" && st != "auth" && st != "confirm" {
+			return
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
 }
 
 func needsRuntime(t string) bool {

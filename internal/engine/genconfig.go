@@ -32,6 +32,9 @@ type GenInput struct {
 	LoopbackIface  string
 	TestPorts      map[string]int // connection id -> plain mixed listener bound to that connection
 	SelfProcesses  []string       // our own executables: always DIRECT (VPN daemons' server traffic)
+	// NoIPv6: the computer has no IPv6 connectivity, so direct connections
+	// use IPv4 only instead of waiting for IPv6 attempts to time out.
+	NoIPv6 bool
 }
 
 const (
@@ -56,8 +59,12 @@ func Generate(in GenInput) (map[string]any, error) {
 	cfg := in.Cfg
 	s := cfg.Settings
 
+	directIP := "ipv4-prefer"
+	if in.NoIPv6 {
+		directIP = "ipv4"
+	}
 	proxies := []map[string]any{
-		{"name": proxyDirect, "type": "direct", "udp": true, "ip-version": "ipv4-prefer"},
+		{"name": proxyDirect, "type": "direct", "udp": true, "ip-version": directIP},
 	}
 	known := map[string]bool{}
 	var serverHosts []string

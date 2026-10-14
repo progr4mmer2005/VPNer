@@ -667,6 +667,7 @@ func (a *App) genConfig() (map[string]any, error) {
 		Cfg: cfg, Endpoints: eps, ControllerPort: m.Port, Secret: m.Secret,
 		LoopbackIface: loopbackIface(), TestPorts: tp,
 		SelfProcesses: []string{filepath.Base(exe), "mihomo.exe"},
+		NoIPv6:        !hasIPv6(),
 	})
 }
 

@@ -7,6 +7,7 @@ package winutil
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -123,17 +124,28 @@ func OpenAppWindow(url, profileDir string) error {
 	if FocusAppWindow(AppWindowTitle) {
 		return nil
 	}
-	if edge := edgePath(); edge != "" {
-		appProfilePrefs(profileDir)
-		cmd := exec.Command(edge, "--app="+url, "--user-data-dir="+profileDir, "--window-size=1180,820",
-			"--no-first-run", "--no-default-browser-check", "--disable-features=Translate", "--lang=ru",
-			// no browser zoom or swipe-back gestures: the window is an app
-			"--disable-pinch", "--overscroll-history-navigation=0")
-		if err := cmd.Start(); err == nil {
-			return nil
-		}
+	if _, err := StartAppWindow(url, profileDir, 1180, 820); err == nil {
+		return nil
 	}
 	return OpenURL(url)
+}
+
+// StartAppWindow opens url as an app window of Microsoft Edge with its own
+// profile and returns the browser process.
+func StartAppWindow(url, profileDir string, width, height int) (*exec.Cmd, error) {
+	edge := edgePath()
+	if edge == "" {
+		return nil, errors.New("не найден Microsoft Edge")
+	}
+	appProfilePrefs(profileDir)
+	cmd := exec.Command(edge, "--app="+url, "--user-data-dir="+profileDir, fmt.Sprintf("--window-size=%d,%d", width, height),
+		"--no-first-run", "--no-default-browser-check", "--disable-features=Translate", "--lang=ru",
+		// no browser zoom or swipe-back gestures: the window is an app
+		"--disable-pinch", "--overscroll-history-navigation=0")
+	if err := cmd.Start(); err != nil {
+		return nil, err
+	}
+	return cmd, nil
 }
 
 // appProfilePrefs turns off the browser features that make no sense in the

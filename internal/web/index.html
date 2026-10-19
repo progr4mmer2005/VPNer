@@ -759,6 +759,7 @@ async function boot() {
   }
   connectEvents();
   setTab(location.search.slice(1) || "conns");
+  decWatch();
 }
 function connectEvents() {
   const es = new EventSource("/api/events?token=" + encodeURIComponent(TOKEN));
@@ -1056,30 +1057,103 @@ document.addEventListener("visibilitychange", () => document.documentElement.cla
 
 // Text effects of the CLI theme: headings type themselves, menu items
 // "decrypt" on hover. Only text nodes are touched, never markup.
-const SCRAMBLE = "!<>-_\\/[]{}—=+*^?#01アカサ";
+// Characters "decrypt" into place: every cell cycles through random signs
+// until it settles on its letter, in a wave from left to right. Used for
+// tab switches, for any text that changes on screen and for small effects.
+const DEC_CHARS = "!<>-_\\/[]{}=+*^?#$%&@0123456789ABCDEFXZ";
+const DEC = { anims: new Map(), raf: 0, obs: null, prev: [], tab: null, pending: false };
+const decOn = () => apTheme().id === "cli" && fxOn("decrypt");
+const DEC_SKIP = "input, textarea, select, option, script, style, svg, .logs, .cpop";
+function decAnimate(node, text, ms) {
+  const chars = [...text], n = chars.length, start = performance.now(), dur = ms || Math.min(650, 240 + n * 7);
+  DEC.anims.set(node, { text, chars, times: chars.map((_, i) => start + (i / Math.max(1, n)) * dur * .55 + Math.random() * dur * .45) });
+  if (!DEC.raf) DEC.raf = requestAnimationFrame(decFrame);
+}
+function decFrame(t) {
+  DEC.raf = 0;
+  for (const [node, a] of DEC.anims) {
+    if (!node.isConnected) { DEC.anims.delete(node); continue; }
+    let done = true;
+    const out = a.chars.map((ch, i) => {
+      if (t >= a.times[i] || !ch.trim()) return ch;
+      done = false;
+      return DEC_CHARS[(Math.random() * DEC_CHARS.length) | 0];
+    }).join("");
+    node.nodeValue = done ? a.text : out;
+    if (done) DEC.anims.delete(node);
+  }
+  if (DEC.obs) DEC.obs.takeRecords(); // our own writes are not changes to animate
+  if (DEC.anims.size) DEC.raf = requestAnimationFrame(decFrame);
+}
+// scrambleOnce runs the effect on the first text of an element.
 function scrambleOnce(el, ms) {
-  if (!el || el.dataset.scrambling) return;
-  const node = [...el.childNodes].find(n => n.nodeType === 3 && n.textContent.trim());
-  if (!node) return;
-  const orig = node.textContent; el.dataset.scrambling = "1";
-  const start = performance.now();
-  const step = t => {
-    const k = Math.min(1, (t - start) / ms), keep = Math.floor(orig.length * k);
-    node.textContent = orig.slice(0, keep) + [...orig.slice(keep)].map(ch => ch === " " ? " " : SCRAMBLE[(Math.random() * SCRAMBLE.length) | 0]).join("");
-    if (k < 1) requestAnimationFrame(step); else { node.textContent = orig; delete el.dataset.scrambling; }
-  };
-  requestAnimationFrame(step);
+  const node = el && [...el.childNodes].find(n => n.nodeType === 3 && n.nodeValue.trim());
+  if (node && !DEC.anims.has(node)) decAnimate(node, node.nodeValue, ms);
+}
+const decScopes = () => ["#view", "header.top", "nav"].map(q => $(q)).filter(Boolean);
+function decTextNodes() {
+  const out = [];
+  for (const root of decScopes()) {
+    const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode: n => !n.nodeValue.trim() || (n.parentElement && n.parentElement.closest(DEC_SKIP)) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
+    for (let n; (n = w.nextNode());) out.push(n);
+  }
+  return out;
+}
+const decTyping = n => n.parentElement && n.parentElement.closest("[data-typing]");
+// the text a node is going to show (typed headings: their whole text)
+const decText = n => { const t = decTyping(n); return t ? t.dataset.typing : (DEC.anims.get(n) || {}).text ?? n.nodeValue; };
+function decVisible(n) {
+  const r = n.parentElement.getBoundingClientRect();
+  return r.bottom > 0 && r.top < innerHeight && r.width > 0;
+}
+// decScan compares the screen with the previous state: after a tab switch
+// everything visible decrypts, otherwise only text that is new.
+function decScan() {
+  DEC.pending = false;
+  const nodes = decTextNodes();
+  if (decOn()) {
+    const full = DEC.tab !== S.tab, bag = new Map();
+    if (!full) for (const t of DEC.prev) bag.set(t, (bag.get(t) || 0) + 1);
+    let budget = 3500;
+    for (const n of nodes) {
+      const t = decText(n);
+      if (!full && bag.get(t)) { bag.set(t, bag.get(t) - 1); continue; }
+      if (DEC.anims.has(n) || decTyping(n) || budget <= 0 || !decVisible(n)) continue;
+      budget -= t.length;
+      decAnimate(n, t);
+    }
+  }
+  DEC.tab = S.tab;
+  DEC.prev = nodes.map(decText);
+}
+function decWatch() {
+  if (DEC.obs) return;
+  DEC.obs = new MutationObserver(() => {
+    if (DEC.pending) return;
+    DEC.pending = true;
+    requestAnimationFrame(decScan);
+  });
+  for (const root of decScopes()) DEC.obs.observe(root, { subtree: true, childList: true, characterData: true });
+  decScan();
 }
 let typedTab = null;
+// The main heading of a tab types itself — after the screen decryption,
+// when that is on. While typing, the decryption leaves it alone.
 function fxTypeHeading() {
   if (apTheme().id !== "cli" || !fxOn("type") || typedTab === S.tab) return;
   typedTab = S.tab;
   const h = $("#view h2");
   if (!h || h.children.length) return;
   const full = h.textContent; let n = 0;
+  h.dataset.typing = full;
   h.textContent = "";
-  const tick = () => { h.textContent = full.slice(0, ++n); if (n < full.length && h.isConnected) setTimeout(tick, 22 + Math.random() * 30); };
-  tick();
+  const tick = () => {
+    if (!h.isConnected) return;
+    h.textContent = full.slice(0, ++n);
+    if (n < full.length) setTimeout(tick, 34 + Math.random() * 40);
+    else delete h.dataset.typing;
+  };
+  setTimeout(tick, decOn() ? 520 : 0);
 }
 document.addEventListener("mouseover", e => {
   const a = e.target.closest && e.target.closest("nav a");

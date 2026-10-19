@@ -59,6 +59,8 @@ h2 { font-size: 20px; margin: 0 0 4px; font-weight: 650; }
 .btn.danger { color: var(--bad); }
 .btn.danger-fill { background: var(--bad); border-color: var(--bad); color: #fff; }
 .btn.danger-fill:hover { filter: brightness(1.07); }
+.btn.link { border: none; background: none; padding: 0; color: var(--accent); font: inherit; cursor: pointer; }
+.btn.link:hover { text-decoration: underline; background: none; }
 .btn.big { padding: 9px 18px; font-weight: 600; }
 .btn.small { padding: 4px 10px; font-size: 13px; }
 .btn.ghost { border-color: transparent; background: transparent; }
@@ -216,6 +218,10 @@ label.check input.switch { margin-top: 1px; }
 .ctx-menu button:disabled { color: var(--muted); opacity: .6; cursor: default; }
 .ctx-menu kbd { font: inherit; color: var(--muted); }
 .ctx-menu hr { border: none; border-top: 1px solid var(--line); margin: 4px 2px; }
+/* app, not a web page: labels and buttons are not selectable text */
+body { user-select: none; -webkit-user-select: none; }
+input, textarea, [contenteditable="true"], .mono, .logs, .detail, .kv, td, .dialog-text, .selectable { user-select: text; -webkit-user-select: text; }
+a, img, svg { -webkit-user-drag: none; }
 .modal header { padding: 16px 20px 6px; display: flex; align-items: center; gap: 10px; }
 .modal header h3 { margin: 0; font-size: 17px; flex: 1; }
 .modal .body { padding: 8px 20px 10px; overflow: auto; }
@@ -691,6 +697,33 @@ addEventListener("mousedown", e => { if (ctxMenu && !ctxMenu.contains(e.target))
 addEventListener("blur", closeCtx);
 addEventListener("resize", closeCtx);
 document.addEventListener("scroll", closeCtx, true);
+
+// Browser shortcuts that do not belong in an app window: reload, print,
+// save page, view source, find, history/downloads, zoom, dev tools.
+const BLOCKED_CTRL = new Set(["r", "p", "s", "u", "f", "g", "h", "j", "d", "o", "e", "k", "l", "n", "t", "+", "=", "-", "_", "0"]);
+const BLOCKED_CTRL_SHIFT = new Set(["i", "j", "c", "r", "s", "b", "o", "m", "y", "a", "delete"]);
+addEventListener("keydown", e => {
+  if (ctxMenu && e.key === "Escape") { e.preventDefault(); e.stopPropagation(); closeCtx(); return; }
+  const k = (e.key || "").toLowerCase(), ctrl = e.ctrlKey || e.metaKey;
+  const block = ["f3", "f5", "f7", "f12", "browserback", "browserforward", "browserrefresh", "browsersearch"].includes(k)
+    || (e.altKey && !ctrl && ["arrowleft", "arrowright", "home"].includes(k))
+    || (ctrl && !e.shiftKey && !e.altKey && BLOCKED_CTRL.has(k))
+    || (ctrl && e.shiftKey && BLOCKED_CTRL_SHIFT.has(k));
+  if (block) e.preventDefault();
+}, true);
+// Ctrl+wheel and touchpad pinch would zoom the page.
+addEventListener("wheel", e => { if (e.ctrlKey) e.preventDefault(); }, { passive: false });
+// Mouse back/forward buttons would navigate.
+addEventListener("mouseup", e => { if (e.button === 3 || e.button === 4) e.preventDefault(); });
+// Files or links dropped outside the import area would replace the page.
+for (const t of ["dragover", "drop"]) {
+  document.addEventListener(t, e => {
+    if (e.target.closest && e.target.closest(".drop")) return;
+    e.preventDefault();
+    if (t === "dragover") e.dataTransfer.dropEffect = "none";
+  });
+}
+document.addEventListener("dragstart", e => { if (!(e.target.closest && e.target.closest("input, textarea"))) e.preventDefault(); });
 document.addEventListener("keydown", e => { if (e.key === "Escape" && $("#modal-root").innerHTML) closeModal(); });
 
 function addConn() {
@@ -1251,7 +1284,7 @@ async function renderSettings() {
       ${chk("allowLan", "Локальная сеть напрямую", "Принтеры, NAS, роутер (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16) — без VPN. Правила выше по списку имеют приоритет.")}
       ${chk("blockQuic", "Блокировать QUIC (UDP/443)", "Браузеры перейдут на TCP. Помогает, если сайты через какой-то VPN открываются медленно.")}
     </div>
-    <div class="panel"><h3>DNS</h3><p class="help" style="color:var(--muted);font-size:12.5px;margin:0">Серверы (DoH, DoT, DoQ…), правила для доменов и режим — на вкладке <a href="#" onclick="setTab('dns');return false">DNS</a>.</p></div>
+    <div class="panel"><h3>DNS</h3><p class="help" style="color:var(--muted);font-size:12.5px;margin:0">Серверы (DoH, DoT, DoQ…), правила для доменов и режим — на вкладке <button class="btn link" onclick="setTab('dns')">DNS</button>.</p></div>
     <div class="panel"><h3>Запуск</h3>
       ${chk("autostart", "Запускать вместе с Windows", "Программа стартует свёрнутой в трей при входе в систему, без запроса UAC.")}
       ${chk("startOnLaunch", "Включать маршрутизацию при запуске программы", "Если выключено, программа после запуска ничего не включает, пока вы не нажмёте «Включить».")}

@@ -5,6 +5,7 @@
 package winutil
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"os/exec"
@@ -123,13 +124,55 @@ func OpenAppWindow(url, profileDir string) error {
 		return nil
 	}
 	if edge := edgePath(); edge != "" {
+		appProfilePrefs(profileDir)
 		cmd := exec.Command(edge, "--app="+url, "--user-data-dir="+profileDir, "--window-size=1180,820",
-			"--no-first-run", "--disable-features=Translate", "--lang=ru")
+			"--no-first-run", "--no-default-browser-check", "--disable-features=Translate", "--lang=ru",
+			// no browser zoom or swipe-back gestures: the window is an app
+			"--disable-pinch", "--overscroll-history-navigation=0")
 		if err := cmd.Start(); err == nil {
 			return nil
 		}
 	}
 	return OpenURL(url)
+}
+
+// appProfilePrefs turns off the browser features that make no sense in the
+// VPNer window (offers to save passwords, autofill suggestions, translation)
+// in its own Edge profile.
+func appProfilePrefs(profileDir string) {
+	p := filepath.Join(profileDir, "Default", "Preferences")
+	prefs := map[string]any{}
+	if b, err := os.ReadFile(p); err == nil {
+		if json.Unmarshal(b, &prefs) != nil {
+			return // leave a file we cannot read alone
+		}
+	}
+	set := func(path string, v any) {
+		keys := strings.Split(path, ".")
+		m := prefs
+		for _, k := range keys[:len(keys)-1] {
+			next, ok := m[k].(map[string]any)
+			if !ok {
+				next = map[string]any{}
+				m[k] = next
+			}
+			m = next
+		}
+		m[keys[len(keys)-1]] = v
+	}
+	set("credentials_enable_service", false)
+	set("credentials_enable_autosignin", false)
+	set("profile.password_manager_enabled", false)
+	set("autofill.enabled", false)
+	set("autofill.profile_enabled", false)
+	set("autofill.credit_card_enabled", false)
+	set("translate.enabled", false)
+	b, err := json.Marshal(prefs)
+	if err != nil {
+		return
+	}
+	os.MkdirAll(filepath.Dir(p), 0o700)
+	os.WriteFile(p, b, 0o600)
 }
 
 // OpenVMConsole opens the Hyper-V console window of a VM.

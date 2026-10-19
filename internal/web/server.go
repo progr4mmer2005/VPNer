@@ -12,6 +12,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -249,16 +250,47 @@ func (s *Server) routes(mux *http.ServeMux) {
 		}
 		writeJSON(w, out)
 	})
-	mux.HandleFunc("GET /api/export", func(w http.ResponseWriter, r *http.Request) {
-		data, err := s.App.Export(r.URL.Query().Get("secrets") == "1")
+
+	// Export into a file chosen in the standard Windows "Save as" dialog
+	// (instead of a browser download).
+	mux.HandleFunc("POST /api/export/save", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Secrets bool `json:"secrets"`
+		}
+		if err := readJSON(r, &req); err != nil {
+			writeErr(w, err)
+			return
+		}
+		data, err := s.App.Export(req.Secrets)
 		if err != nil {
 			writeErr(w, err)
 			return
 		}
 		name := "vpner-profile-" + time.Now().Format("2006-01-02") + ".json"
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.Header().Set("Content-Disposition", `attachment; filename="`+name+`"`)
-		w.Write(data)
+		path, ok, err := winutil.SaveFileDialog("Сохранить профиль VPNer", name, "Профиль VPNer", "json")
+		if err != nil {
+			writeErr(w, err)
+			return
+		}
+		if !ok {
+			writeJSON(w, map[string]any{"canceled": true})
+			return
+		}
+		if err := os.WriteFile(path, data, 0o600); err != nil {
+			writeErr(w, err)
+			return
+		}
+		writeJSON(w, map[string]any{"path": path})
+	})
+	// The clipboard for the window's own "Вставить" menu item (the browser
+	// would ask for a permission).
+	mux.HandleFunc("GET /api/clipboard", func(w http.ResponseWriter, r *http.Request) {
+		text, err := winutil.ClipboardText()
+		if err != nil {
+			writeErr(w, err)
+			return
+		}
+		writeJSON(w, map[string]string{"text": text})
 	})
 
 	mux.HandleFunc("PUT /api/rules", func(w http.ResponseWriter, r *http.Request) {

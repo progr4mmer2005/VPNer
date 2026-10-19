@@ -66,6 +66,9 @@ func (a *App) ImportData(filename, data string, dry bool, opt ImportOptions) (*I
 	if opt.Settings && res.DNS != nil {
 		cfg.DNS = *res.DNS
 	}
+	if opt.Settings && len(res.Appearance) > 0 {
+		cfg.Appearance = res.Appearance
+	}
 	if opt.Final && res.FinalTarget != "" {
 		cfg.Settings.FinalTarget = res.FinalTarget
 	}

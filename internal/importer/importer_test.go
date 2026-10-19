@@ -1,6 +1,7 @@
 package importer
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -126,5 +127,31 @@ func TestProfileRoundTrip(t *testing.T) {
 		if got := work.S("password"); (got == "secret") != withSecrets {
 			t.Errorf("withSecrets=%v but password=%q", withSecrets, got)
 		}
+	}
+}
+
+// The look travels with the profile; per-connection colors follow the new
+// connection ids.
+func TestProfileAppearance(t *testing.T) {
+	cfg := config.Default()
+	cfg.Connections = []config.Connection{{ID: "cold1", Name: "Work", Type: "openconnect", Enabled: true, Params: map[string]string{"server": "vpn.corp"}}}
+	cfg.Appearance = []byte(`{"theme":"cli","values":{"conn:cold1":{"m":"own","v":"#ff0000"}}}`)
+	data, err := Export(cfg, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := Parse("vpner-profile.json", string(data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got struct {
+		Theme  string         `json:"theme"`
+		Values map[string]any `json:"values"`
+	}
+	if err := json.Unmarshal(res.Appearance, &got); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := got.Values["conn:"+res.Connections[0].ID]; got.Theme != "cli" || !ok || len(got.Values) != 1 {
+		t.Errorf("appearance not carried over or not remapped: %s", res.Appearance)
 	}
 }

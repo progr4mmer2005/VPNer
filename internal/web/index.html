@@ -6,18 +6,37 @@
 <title>VPNer</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232f6fed'/%3E%3Cpath d='M9 10l7 13 7-13' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <style>
-:root {
-  color-scheme: light dark;
-  --scroll: #c4c9d0; --scroll-hover: #a3aab3;
-  --bg: #f4f5f7; --panel: #ffffff; --panel2: #f9fafb; --text: #1b1f24; --muted: #6a737d; --line: #e3e6ea;
-  --accent: #2f6fed; --accent-weak: #e8f0fe; --ok: #1a7f37; --ok-weak: #e6f4ea; --warn: #9a6700; --warn-weak: #fff4d6;
-  --bad: #cf222e; --bad-weak: #fde8e8; --shadow: 0 1px 2px rgba(0,0,0,.06), 0 2px 8px rgba(0,0,0,.04);
-  --radius: 10px; --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+/* ---------- design tokens ----------
+   Themes ([data-theme]) and the light/dark mode ([data-mode]) set them; the
+   user's own values from «Оформление» are inline styles on <html> and win.
+   The selectors are not tied to :root, so theme previews can use them too. */
+:root, [data-theme="standard"] {
+  color-scheme: light;
+  --bg: #f4f5f7; --panel: #ffffff; --text: #1b1f24;
+  --accent: #2f6fed; --on-accent: #ffffff; --ok: #1a7f37; --warn: #9a6700; --bad: #cf222e;
+  --c-native: var(--accent); --c-wsl: #8250df; --c-vm: #bc4c00;
+  --radius: 10px; --r-btn: calc(var(--radius) * .8); --r-modal: calc(var(--radius) * 1.4); --r-badge: 999px;
+  --font: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --shadow: 0 1px 2px rgba(0,0,0,.06), 0 2px 8px rgba(0,0,0,.04);
+  --overlay: rgba(10,14,20,.45);
 }
-@media (prefers-color-scheme: dark) {
-  :root { --bg: #0f1216; --panel: #171b21; --panel2: #1d222a; --text: #e6e8eb; --muted: #8b949e; --line: #2a313b;
-    --accent: #5b8cff; --accent-weak: #1c2a47; --ok: #3fb950; --ok-weak: #13281a; --warn: #d29922; --warn-weak: #2c2412;
-    --bad: #f85149; --bad-weak: #3a1618; --shadow: none; --scroll: #3a424d; --scroll-hover: #4c5562; }
+[data-mode="dark"] {
+  color-scheme: dark;
+  --bg: #0f1216; --panel: #171b21; --text: #e6e8eb;
+  --accent: #5b8cff; --ok: #3fb950; --warn: #d29922; --bad: #f85149; --c-wsl: #a371f7; --c-vm: #db6d28;
+  --shadow: none;
+}
+/* tokens derived from the base ones, so one changed color stays coherent */
+:root, [data-theme] {
+  --panel2: color-mix(in srgb, var(--panel) 96%, var(--text));
+  --line: color-mix(in srgb, var(--panel) 88%, var(--text));
+  --muted: color-mix(in srgb, var(--text) 64%, var(--panel));
+  --accent-weak: color-mix(in srgb, var(--accent) 14%, var(--panel));
+  --ok-weak: color-mix(in srgb, var(--ok) 13%, var(--panel));
+  --warn-weak: color-mix(in srgb, var(--warn) 14%, var(--panel));
+  --bad-weak: color-mix(in srgb, var(--bad) 12%, var(--panel));
+  --scroll: color-mix(in srgb, var(--panel) 78%, var(--text)); --scroll-hover: color-mix(in srgb, var(--panel) 64%, var(--text));
 }
 * { box-sizing: border-box; }
 * { scrollbar-width: thin; scrollbar-color: var(--scroll) transparent; }
@@ -27,13 +46,15 @@
 ::-webkit-scrollbar-thumb:hover { background: var(--scroll-hover); background-clip: padding-box; border: 2px solid transparent; }
 ::-webkit-scrollbar-corner { background: transparent; }
 html, body { margin: 0; height: 100%; }
-body { background: var(--bg); color: var(--text); font: 14px/1.45 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; }
+body { background: var(--bg); color: var(--text); font: 14px/1.45 var(--font); }
+.app { position: relative; z-index: 1; }
 button, input, select, textarea { font: inherit; color: inherit; }
 .app { display: grid; grid-template-columns: 210px 1fr; height: 100vh; }
 nav { background: var(--panel); border-right: 1px solid var(--line); display: flex; flex-direction: column; padding: 14px 10px; gap: 2px; }
 .brand { display: flex; align-items: center; gap: 10px; font-weight: 650; font-size: 17px; padding: 4px 8px 16px; }
 .brand svg { width: 28px; height: 28px; }
-nav a { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; color: var(--text); text-decoration: none; cursor: pointer; user-select: none; }
+.brand svg rect { fill: var(--accent); } .brand svg path { stroke: var(--on-accent); }
+nav a { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--r-btn); color: var(--text); text-decoration: none; cursor: pointer; user-select: none; }
 nav a:hover { background: var(--panel2); }
 nav a.active { background: var(--accent-weak); color: var(--accent); font-weight: 600; }
 nav .count { margin-left: auto; font-size: 12px; color: var(--muted); }
@@ -51,10 +72,10 @@ header.top { position: sticky; top: 0; z-index: 5; background: var(--bg); paddin
 .content { padding: 20px 24px 40px; max-width: 1180px; width: 100%; }
 h2 { font-size: 20px; margin: 0 0 4px; font-weight: 650; }
 .lead { color: var(--muted); margin: 0 0 18px; max-width: 760px; }
-.btn { border: 1px solid var(--line); background: var(--panel); padding: 7px 14px; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.btn { border: 1px solid var(--line); background: var(--panel); padding: 7px 14px; border-radius: var(--r-btn); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .btn:hover { background: var(--panel2); }
 .btn:disabled { opacity: .5; cursor: default; }
-.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .btn.primary:hover { filter: brightness(1.07); }
 .btn.danger { color: var(--bad); }
 .btn.danger-fill { background: var(--bad); border-color: var(--bad); color: #fff; }
@@ -87,10 +108,10 @@ h2 { font-size: 20px; margin: 0 0 4px; font-weight: 650; }
 .card .kv { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 13px; }
 .card .kv span:nth-child(odd) { color: var(--muted); }
 .card .actions { display: flex; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
-.badge { display: inline-block; font-size: 11.5px; padding: 1px 8px; border-radius: 999px; background: var(--panel2); border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
-.badge.native { color: var(--accent); background: var(--accent-weak); border-color: transparent; }
-.badge.wsl { color: #8250df; background: rgba(130,80,223,.12); border-color: transparent; }
-.badge.vm { color: #bc4c00; background: rgba(188,76,0,.12); border-color: transparent; }
+.badge { display: inline-block; font-size: 11.5px; padding: 1px 8px; border-radius: var(--r-badge); background: var(--panel2); border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+.badge.native { color: var(--c-native); background: color-mix(in srgb, var(--c-native) 13%, transparent); border-color: transparent; }
+.badge.wsl { color: var(--c-wsl); background: color-mix(in srgb, var(--c-wsl) 13%, transparent); border-color: transparent; }
+.badge.vm { color: var(--c-vm); background: color-mix(in srgb, var(--c-vm) 13%, transparent); border-color: transparent; }
 .state { font-size: 12.5px; font-weight: 600; }
 .state.ok { color: var(--ok); } .state.warn { color: var(--warn); } .state.bad { color: var(--bad); } .state.muted { color: var(--muted); }
 .empty { text-align: center; padding: 50px 20px; color: var(--muted); border: 1.5px dashed var(--line); border-radius: var(--radius); }
@@ -114,7 +135,7 @@ td.mono, .mono { font-family: var(--mono); font-size: 12.5px; word-break: break-
 .rule.dragging { opacity: .4; }
 .rule.drop-before { box-shadow: 0 -3px 0 0 var(--accent); }
 .rule.drop-after { box-shadow: 0 3px 0 0 var(--accent); }
-.r-grip { display: flex; align-items: center; justify-content: center; height: 32px; color: var(--muted); cursor: grab; border-radius: 6px; opacity: .5; }
+.r-grip { display: flex; align-items: center; justify-content: center; height: 32px; color: var(--muted); cursor: grab; border-radius: var(--r-btn); opacity: .5; }
 .rule:hover .r-grip { opacity: 1; }
 .r-grip:hover { background: var(--panel2); color: var(--text); }
 .r-grip:active { cursor: grabbing; }
@@ -135,15 +156,15 @@ body.rule-dragging, body.rule-dragging * { cursor: grabbing !important; }
 .r-vals .hint { font-size: 12px; color: var(--muted); line-height: 1.4; }
 .r-vals .btn.small { padding: 3px 10px; font-size: 12.5px; align-self: flex-start; }
 .r-actions { display: flex; align-items: center; gap: 2px; height: 32px; }
-.icon-btn { width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid transparent; border-radius: 8px;
+.icon-btn { width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid transparent; border-radius: var(--r-btn);
   background: transparent; color: var(--muted); cursor: pointer; padding: 0; flex: none; transition: background .12s, color .12s, border-color .12s; }
 .icon-btn:hover:not(:disabled) { background: var(--panel2); color: var(--text); border-color: var(--line); }
 .icon-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-weak); }
 .icon-btn:disabled { opacity: .28; cursor: default; }
 .icon-btn.danger:hover:not(:disabled) { background: var(--bad-weak); color: var(--bad); border-color: transparent; }
 .icon-btn svg { width: 16px; height: 16px; }
-.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; padding: 3px; gap: 3px; background: var(--panel2); flex-wrap: wrap; }
-.seg button { border: none; background: transparent; padding: 6px 14px; border-radius: 7px; cursor: pointer; color: var(--muted); font-weight: 600; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: calc(var(--r-btn) + 1px); padding: 3px; gap: 3px; background: var(--panel2); flex-wrap: wrap; }
+.seg button { border: none; background: transparent; padding: 6px 14px; border-radius: max(0px, calc(var(--r-btn) - 2px)); cursor: pointer; color: var(--muted); font-weight: 600; }
 .seg button.on { background: var(--panel); color: var(--text); box-shadow: var(--shadow), 0 0 0 1px var(--line); }
 .dns-list { display: flex; flex-direction: column; gap: 8px; container-type: inline-size; container-name: dnsl; }
 .dns-srv { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 10px 10px 12px; display: grid; gap: 8px 10px; align-items: center;
@@ -185,7 +206,7 @@ input[type=checkbox].switch:checked { background: var(--accent); }
 input[type=checkbox].switch:checked::after { transform: translateX(14px); }
 input[type=checkbox].switch:focus-visible { box-shadow: 0 0 0 3px var(--accent-weak); outline: none; }
 a { color: var(--accent); }
-input[type=text], input[type=number], input[type=password], select, textarea { width: 100%; background: var(--panel); border: 1px solid var(--line); border-radius: 7px; padding: 6px 9px; outline: none; }
+input[type=text], input[type=number], input[type=password], select, textarea { width: 100%; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-btn); padding: 6px 9px; outline: none; }
 input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-weak); }
 textarea { resize: vertical; min-height: 34px; font-family: var(--mono); font-size: 12.5px; }
 input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--accent); margin: 8px 0 0; }
@@ -200,20 +221,20 @@ label.check input.switch { margin-top: 1px; }
 .final { display: grid; grid-template-columns: 1fr 260px; gap: 12px; align-items: center; }
 .savebar { position: sticky; bottom: 0; background: var(--bg); padding: 12px 0; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; border-top: 1px solid var(--line); margin-top: 14px; }
 .savebar .help { min-width: 0; }
-.modal-bg { position: fixed; inset: 0; background: rgba(10,14,20,.45); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 20px; }
-.modal { background: var(--panel); border-radius: 14px; width: 640px; max-width: 100%; max-height: calc(100vh - 40px); display: flex; flex-direction: column; box-shadow: 0 10px 40px rgba(0,0,0,.25); }
+.modal-bg { position: fixed; inset: 0; background: var(--overlay); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 20px; }
+.modal { background: var(--panel); border-radius: var(--r-modal); width: 640px; max-width: 100%; max-height: calc(100vh - 40px); display: flex; flex-direction: column; box-shadow: 0 10px 40px rgba(0,0,0,.25); }
 .modal.wide { width: 860px; }
 /* in-app dialogs (instead of the browser's alert/confirm), above modals */
-.dialog-bg { position: fixed; inset: 0; background: rgba(10,14,20,.45); display: flex; align-items: center; justify-content: center; z-index: 80; padding: 20px; animation: fade-in .12s ease-out; }
+.dialog-bg { position: fixed; inset: 0; background: var(--overlay); display: flex; align-items: center; justify-content: center; z-index: 80; padding: 20px; animation: fade-in .12s ease-out; }
 .modal.dialog { width: 440px; animation: pop-in .14s ease-out; }
 .dialog-text { margin: 0; white-space: pre-line; line-height: 1.5; }
 @keyframes fade-in { from { opacity: 0; } }
 @keyframes pop-in { from { opacity: 0; transform: scale(.97); } }
 @media (prefers-reduced-motion: reduce) { .dialog-bg, .modal.dialog { animation: none; } }
 /* the window's own context menu */
-.ctx-menu { position: fixed; z-index: 90; min-width: 180px; padding: 5px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+.ctx-menu { position: fixed; z-index: 90; min-width: 180px; padding: 5px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
   box-shadow: 0 10px 30px rgba(0,0,0,.28); display: flex; flex-direction: column; }
-.ctx-menu button { display: flex; justify-content: space-between; gap: 24px; border: none; background: none; text-align: left; padding: 7px 10px; border-radius: 6px; cursor: pointer; color: var(--text); font-size: 13px; }
+.ctx-menu button { display: flex; justify-content: space-between; gap: 24px; border: none; background: none; text-align: left; padding: 7px 10px; border-radius: max(0px, calc(var(--r-btn) - 2px)); cursor: pointer; color: var(--text); font-size: 13px; }
 .ctx-menu button:hover:not(:disabled), .ctx-menu button:focus-visible { background: var(--panel2); outline: none; }
 .ctx-menu button:disabled { color: var(--muted); opacity: .6; cursor: default; }
 .ctx-menu kbd { font: inherit; color: var(--muted); }
@@ -242,14 +263,14 @@ details > summary { cursor: pointer; color: var(--muted); margin: 6px 0 12px; us
 .logs .warning { color: var(--warn); }
 .verdict { font-weight: 600; }
 .verdict.ok { color: var(--ok); } .verdict.leak { color: var(--bad); } .verdict.error { color: var(--warn); } .verdict.info, .verdict.direct { color: var(--muted); }
-.list { max-height: 420px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; }
+.list { max-height: 420px; overflow: auto; border: 1px solid var(--line); border-radius: var(--r-btn); }
 .list label { display: flex; gap: 10px; padding: 6px 10px; border-bottom: 1px solid var(--line); cursor: pointer; align-items: center; }
 .list label:hover { background: var(--panel2); }
 .list label input { margin: 0; }
 .list small { color: var(--muted); font-family: var(--mono); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .protect { display: grid; grid-template-columns: 22px 1fr; gap: 6px 10px; }
 .protect .y { color: var(--ok); font-weight: 700; } .protect .n { color: var(--warn); font-weight: 700; }
-.toast { position: fixed; right: 20px; bottom: 20px; background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 10px; z-index: 100; max-width: 460px; box-shadow: 0 6px 24px rgba(0,0,0,.3); white-space: pre-wrap; }
+.toast { position: fixed; right: 20px; bottom: 20px; background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: var(--radius); z-index: 100; max-width: 460px; box-shadow: 0 6px 24px rgba(0,0,0,.3); white-space: pre-wrap; }
 .toast.bad { background: var(--bad); color: #fff; }
 .tabs-inline { display: flex; gap: 6px; margin-bottom: 12px; }
 .burger { display: none; }
@@ -259,9 +280,9 @@ details > summary { cursor: pointer; color: var(--muted); margin: 6px 0 12px; us
   .app { grid-template-columns: 1fr; }
   nav { position: fixed; z-index: 60; inset: 0 auto 0 0; width: min(280px, 84vw); transform: translateX(-104%); transition: transform .22s ease; box-shadow: 0 0 40px rgba(0,0,0,.35); padding-top: 12px; }
   .app.nav-open nav { transform: none; }
-  .scrim { display: block; position: fixed; inset: 0; z-index: 55; background: rgba(10,14,20,.45); opacity: 0; pointer-events: none; transition: opacity .22s; }
+  .scrim { display: block; position: fixed; inset: 0; z-index: 55; background: var(--overlay); opacity: 0; pointer-events: none; transition: opacity .22s; }
   .app.nav-open .scrim { opacity: 1; pointer-events: auto; }
-  .burger { display: inline-flex; width: 38px; height: 38px; align-items: center; justify-content: center; border: 1px solid var(--line); background: var(--panel); border-radius: 9px; cursor: pointer; color: var(--text); flex: none; padding: 0; }
+  .burger { display: inline-flex; width: 38px; height: 38px; align-items: center; justify-content: center; border: 1px solid var(--line); background: var(--panel); border-radius: var(--r-btn); cursor: pointer; color: var(--text); flex: none; padding: 0; }
   .burger:hover { background: var(--panel2); }
   header.top { gap: 12px; }
   .content, header.top { padding-left: 16px; padding-right: 16px; }
@@ -274,23 +295,209 @@ details > summary { cursor: pointer; color: var(--muted); margin: 6px 0 12px; us
   .status .big { font-size: 14.5px; }
   .btn.big { padding: 8px 12px; }
   .modal-bg { padding: 0; align-items: flex-end; }
-  .modal, .modal.wide { width: 100%; max-height: 92vh; border-radius: 16px 16px 0 0; }
+  .modal, .modal.wide { width: 100%; max-height: 92vh; border-radius: var(--r-modal) var(--r-modal) 0 0; }
   .card .actions .grow { display: none; }
 }
+/* ---------- «Оформление» tab ---------- */
+.themes { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); gap: 12px; }
+.theme-card { border: 1.5px solid var(--line); border-radius: var(--radius); padding: 0; overflow: hidden; background: var(--panel); cursor: pointer; text-align: left; display: flex; flex-direction: column; color: var(--text); }
+.theme-card:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
+.theme-card.on { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-weak); }
+.theme-card .tc-info { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 3px; }
+.theme-card .tc-info small { color: var(--muted); font-size: 12px; line-height: 1.35; }
+.th-prev { height: 108px; display: grid; grid-template-columns: 34% 1fr; gap: 8px; padding: 10px; background: var(--bg); color: var(--text); font: 11px/1.3 var(--font); }
+.th-prev .p-nav { background: var(--panel); border: 1px solid var(--line); border-radius: max(2px, calc(var(--radius) * .6)); padding: 6px; display: flex; flex-direction: column; gap: 4px; }
+.th-prev .p-nav i { display: block; height: 6px; border-radius: 3px; background: var(--line); }
+.th-prev .p-nav i.on { background: var(--accent); }
+.th-prev .p-main { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.th-prev .p-card { flex: 1; background: var(--panel); border: 1px solid var(--line); border-radius: max(2px, calc(var(--radius) * .6)); padding: 6px 8px; display: flex; flex-direction: column; gap: 4px; overflow: hidden; }
+.th-prev .p-card b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.th-prev .p-row { display: flex; gap: 5px; align-items: center; }
+.th-prev .p-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); flex: none; }
+.th-prev .p-btn { align-self: flex-start; background: var(--accent); color: var(--on-accent); border-radius: max(1px, calc(var(--radius) * .45)); padding: 2px 8px; font-size: 10px; }
+.th-prev[data-theme="glass"] { background: radial-gradient(120% 90% at 10% 0%, var(--wall-1) 0, transparent 60%), radial-gradient(100% 90% at 100% 40%, var(--wall-2) 0, transparent 60%), radial-gradient(110% 90% at 40% 120%, var(--wall-3) 0, transparent 60%), var(--bg); }
+.th-prev[data-theme="glass"] .p-nav, .th-prev[data-theme="glass"] .p-card { background: color-mix(in srgb, var(--panel) 55%, transparent); backdrop-filter: blur(10px); border-color: var(--glass-line); }
+.th-prev[data-theme="cli"] { background: repeating-linear-gradient(transparent 0 2px, rgba(0,0,0,.25) 2px 3px), var(--bg); }
+.th-prev[data-theme="cli"] .p-card b::before { content: "❯ "; color: var(--accent); }
+.th-prev[data-theme="cli"] .p-btn { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+.th-prev[data-theme="cli"] .p-btn::before { content: "[ "; } .th-prev[data-theme="cli"] .p-btn::after { content: " ]"; }
+.th-prev[data-theme="cli"] .p-dot { border-radius: 0; }
+.ap-rows { display: flex; flex-direction: column; container-type: inline-size; container-name: aprows; }
+.ap-row { display: grid; grid-template-columns: minmax(150px, 1fr) 30px 170px minmax(180px, 1.1fr) 30px; gap: 8px 10px; align-items: center; padding: 9px 0; border-top: 1px solid var(--line); }
+.ap-row:first-child { border-top: none; }
+.ap-row .ap-label b { font-weight: 600; font-size: 13px; display: block; }
+.ap-row .ap-label small { color: var(--muted); font-size: 12px; line-height: 1.35; display: block; }
+.ap-val { display: flex; gap: 8px; align-items: center; min-width: 0; }
+.ap-val .hint { color: var(--muted); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ap-val input[type=range] { flex: 1; accent-color: var(--accent); min-width: 0; }
+.ap-val .num { font-family: var(--mono); font-size: 12px; color: var(--muted); width: 38px; text-align: right; }
+.ap-val input.hex { width: 96px; font-family: var(--mono); font-size: 12.5px; }
+.swatch { width: 28px; height: 28px; border-radius: max(4px, calc(var(--r-btn) * .8)); border: 1px solid var(--line); flex: none; position: relative; overflow: hidden; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; }
+.swatch.color { background-image: linear-gradient(45deg, var(--line) 25%, transparent 25%, transparent 75%, var(--line) 75%), linear-gradient(45deg, var(--line) 25%, transparent 25%, transparent 75%, var(--line) 75%); background-size: 8px 8px; background-position: 0 0, 4px 4px; }
+.swatch.color::after { content: ""; position: absolute; inset: 0; background: var(--sw); }
+.swatch.length { background: var(--panel2); }
+.swatch.length::after { content: ""; width: 16px; height: 16px; border: 2px solid var(--accent); border-right: none; border-bottom: none; border-top-left-radius: var(--sw); transform: translate(3px, 3px); }
+.swatch.font { font-family: var(--sw); background: var(--panel2); }
+input[type=color].picker { width: 28px; height: 28px; padding: 0; border: 1px solid var(--line); border-radius: max(4px, calc(var(--r-btn) * .8)); background: none; cursor: pointer; flex: none; }
+input[type=color].picker::-webkit-color-swatch-wrapper { padding: 0; }
+input[type=color].picker::-webkit-color-swatch { border: none; border-radius: max(3px, calc(var(--r-btn) * .8 - 1px)); }
+.ap-sub { font-weight: 600; font-size: 13px; color: var(--muted); margin: 14px 0 2px; }
+.fx-list { display: flex; flex-direction: column; gap: 4px; margin-top: 12px; }
+.cc-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--cc, var(--muted)); flex: none; display: inline-block; }
+.card.cc { box-shadow: inset 3px 0 0 var(--cc), var(--shadow); }
+@container aprows (max-width: 640px) {
+  .ap-row { grid-template-columns: 30px minmax(0, 1fr) 30px; grid-template-areas: "sw label reset" "mode mode mode" "val val val"; }
+  .ap-row > .ap-label { grid-area: label; } .ap-row > .swatch { grid-area: sw; } .ap-row > .ap-mode { grid-area: mode; }
+  .ap-row > .ap-val { grid-area: val; } .ap-row > .icon-btn { grid-area: reset; }
+}
+
+/* ---------- effects layers ---------- */
+#fx-rain, #fx-scan, #fx-noise { position: fixed; inset: 0; pointer-events: none; display: none; }
+#fx-rain { z-index: 0; width: 100%; height: 100%; opacity: .55; }
+#fx-scan { z-index: 70; background: repeating-linear-gradient(to bottom, transparent 0 2px, rgba(0,0,0,.22) 2px 3px), radial-gradient(130% 100% at 50% 50%, transparent 60%, rgba(0,0,0,.35) 100%); animation: fx-flicker 4s steps(40) infinite; }
+#fx-scan::after { content: ""; position: absolute; left: 0; right: 0; height: 120px; top: -120px; background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--accent) 7%, transparent), transparent); animation: fx-beam 7s linear infinite; }
+@keyframes fx-flicker { 0%, 100% { opacity: 1; } 48% { opacity: .92; } 50% { opacity: 1; } 73% { opacity: .96; } }
+@keyframes fx-beam { to { top: 100%; } }
+#fx-noise { z-index: 71; opacity: 0; mix-blend-mode: screen;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1.6 -.5'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E"); }
+:root.fx-rain #fx-rain, :root.fx-scan #fx-scan, :root.fx-glitchable #fx-noise { display: block; }
+:root.fx-glitch #fx-noise { opacity: .16; animation: fx-noise .12s steps(3) infinite; }
+@keyframes fx-noise { 0% { background-position: 0 0; clip-path: inset(10% 0 70% 0); } 33% { background-position: 40px 70px; clip-path: inset(55% 0 20% 0); } 66% { background-position: -60px 20px; clip-path: inset(30% 0 45% 0); } 100% { background-position: 20px -40px; clip-path: inset(80% 0 4% 0); } }
+:root.fx-glitch main > .content, :root.fx-glitch header.top { animation: fx-jitter .1s steps(2) infinite; }
+:root.fx-glitch h2, :root.fx-glitch .brand, :root.fx-glitch .status .big, :root.fx-glitch .card .name { text-shadow: 2px 0 rgba(255,40,90,.8), -2px 0 rgba(0,230,255,.8); }
+@keyframes fx-jitter { 0% { transform: translate(0, 0); } 25% { transform: translate(-3px, 1px) skewX(-1deg); } 50% { transform: translate(2px, -1px); } 75% { transform: translate(-1px, 0) skewX(1deg); } 100% { transform: translate(1px, 1px); } }
+:root.fx-paused #fx-scan, :root.fx-paused #fx-scan::after, :root.fx-paused body::before { animation-play-state: paused; }
+
+/* ---------- theme: CLI / terminal ---------- */
+[data-theme="cli"] {
+  color-scheme: dark;
+  --bg: #0b0d0c; --panel: #111412; --text: #d4dad2;
+  --accent: #e8875a; --on-accent: #0b0d0c; --ok: #7ee787; --warn: #e3b341; --bad: #ff6b6b;
+  --c-native: #79c0ff; --c-wsl: #d2a8ff; --c-vm: #ffa657;
+  --radius: 3px; --r-btn: 2px; --r-modal: 4px; --r-badge: 2px;
+  --font: "Cascadia Mono", "Cascadia Code", Consolas, "Courier New", monospace;
+  --mono: "Cascadia Mono", "Cascadia Code", Consolas, monospace;
+  --shadow: none; --overlay: rgba(0,0,0,.66);
+}
+:root[data-theme="cli"] body { font-size: 13.5px; letter-spacing: .1px; }
+:root[data-theme="cli"] ::selection { background: var(--accent); color: var(--on-accent); }
+:root[data-theme="cli"] nav { background: color-mix(in srgb, var(--panel) 88%, transparent); border-right: 1px solid var(--line); }
+:root[data-theme="cli"] .brand { font-weight: 700; letter-spacing: 1px; }
+:root[data-theme="cli"] .brand::after { content: "_"; color: var(--accent); animation: cli-blink 1.1s steps(1) infinite; margin-left: -8px; }
+:root[data-theme="cli"] nav a { padding-left: 8px; }
+:root[data-theme="cli"] nav a::before { content: "\00a0\00a0"; color: var(--accent); }
+:root[data-theme="cli"] nav a:hover { background: color-mix(in srgb, var(--accent) 9%, transparent); }
+:root[data-theme="cli"] nav a.active { background: transparent; color: var(--accent); font-weight: 600; }
+:root[data-theme="cli"] nav a.active::before { content: "▸\00a0"; }
+:root[data-theme="cli"] header.top { background: color-mix(in srgb, var(--bg) 80%, transparent); backdrop-filter: blur(4px); border-bottom: 1px dashed var(--line); }
+:root[data-theme="cli"] h2::before { content: "❯ "; color: var(--accent); }
+:root[data-theme="cli"] h2::after { content: "▌"; color: var(--accent); margin-left: 4px; animation: cli-blink 1.1s steps(1) infinite; font-weight: 400; }
+:root[data-theme="cli"] h3::before { content: "── "; color: var(--muted); }
+:root[data-theme="cli"] .lead { color: color-mix(in srgb, var(--text) 55%, var(--bg)); }
+:root[data-theme="cli"] .lead::before { content: "# "; color: var(--muted); }
+:root[data-theme="cli"] .card, :root[data-theme="cli"] .panel, :root[data-theme="cli"] .rule, :root[data-theme="cli"] .dns-srv,
+:root[data-theme="cli"] table, :root[data-theme="cli"] .logs, :root[data-theme="cli"] .type, :root[data-theme="cli"] .theme-card { background: color-mix(in srgb, var(--panel) 92%, transparent); }
+:root[data-theme="cli"] .card:hover, :root[data-theme="cli"] .panel:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+:root[data-theme="cli"] .btn:not(.link) { background: transparent; text-transform: lowercase; }
+:root[data-theme="cli"] .btn:not(.link)::before { content: "["; color: var(--muted); margin-right: 2px; }
+:root[data-theme="cli"] .btn:not(.link)::after { content: "]"; color: var(--muted); margin-left: 2px; }
+:root[data-theme="cli"] .btn:not(.link):hover { background: color-mix(in srgb, var(--accent) 12%, transparent); border-color: var(--accent); }
+:root[data-theme="cli"] .btn.primary { color: var(--accent); border-color: var(--accent); }
+:root[data-theme="cli"] .btn.primary:hover { background: var(--accent); color: var(--on-accent); filter: none; }
+:root[data-theme="cli"] .btn.primary:hover::before, :root[data-theme="cli"] .btn.primary:hover::after { color: var(--on-accent); }
+:root[data-theme="cli"] .btn.danger-fill { background: transparent; color: var(--bad); border-color: var(--bad); }
+:root[data-theme="cli"] input[type=text], :root[data-theme="cli"] input[type=number], :root[data-theme="cli"] input[type=password], :root[data-theme="cli"] select, :root[data-theme="cli"] textarea { background: color-mix(in srgb, var(--bg) 70%, var(--panel)); caret-color: var(--accent); }
+:root[data-theme="cli"] input[type=checkbox].switch { border-radius: 2px; background: color-mix(in srgb, var(--line) 80%, var(--bg)); }
+:root[data-theme="cli"] input[type=checkbox].switch::after { border-radius: 1px; box-shadow: none; background: var(--muted); }
+:root[data-theme="cli"] input[type=checkbox].switch:checked { background: var(--accent); }
+:root[data-theme="cli"] input[type=checkbox].switch:checked::after { background: var(--on-accent); }
+:root[data-theme="cli"] .dot { border-radius: 1px; }
+:root[data-theme="cli"] .dot.warn { animation: cli-blink 1.4s steps(1) infinite; }
+:root[data-theme="cli"] .badge { background: transparent !important; border: 1px solid currentColor !important; }
+:root[data-theme="cli"] .badge::before { content: "<"; } :root[data-theme="cli"] .badge::after { content: ">"; }
+:root[data-theme="cli"] th { text-transform: uppercase; letter-spacing: .6px; font-size: 11.5px; }
+:root[data-theme="cli"] .modal { border: 1px solid var(--accent); box-shadow: 0 0 0 1px var(--bg), 0 0 40px color-mix(in srgb, var(--accent) 25%, transparent); }
+:root[data-theme="cli"] .modal header h3::before { content: "┤ "; color: var(--accent); }
+:root[data-theme="cli"] .modal header h3::after { content: " ├"; color: var(--accent); }
+:root[data-theme="cli"] .toast { background: var(--panel); color: var(--text); border: 1px solid var(--accent); }
+:root[data-theme="cli"] .toast::before { content: "» "; color: var(--accent); }
+:root[data-theme="cli"] .empty { border-style: dashed; }
+:root[data-theme="cli"] ::-webkit-scrollbar-thumb { border-radius: 0; }
+:root[data-theme="cli"] .cc-dot { border-radius: 1px; }
+@keyframes cli-blink { 50% { opacity: 0; } }
+
+/* ---------- theme: glass (Windows 11) ---------- */
+[data-theme="glass"] {
+  color-scheme: light;
+  --bg: #dbe5f3; --panel: #ffffff; --text: #1a1a1a;
+  --accent: #0067c0; --on-accent: #ffffff; --ok: #0f7b0f; --warn: #9d5d00; --bad: #c42b1c;
+  --c-wsl: #8b3fd9; --c-vm: #b84f00;
+  --radius: 8px; --r-btn: 4px; --r-modal: 8px;
+  --font: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --line: color-mix(in srgb, var(--text) 10%, transparent);
+  --glass: color-mix(in srgb, var(--panel) 58%, transparent); --glass-strong: color-mix(in srgb, var(--panel) 72%, transparent);
+  --glass-line: rgba(255,255,255,.6);
+  --shadow: 0 2px 6px rgba(0,0,0,.05), 0 8px 26px rgba(20,40,80,.08);
+  --wall-1: #8fb6ff; --wall-2: #d0a8ff; --wall-3: #8ae3d8;
+}
+[data-theme="glass"][data-mode="dark"] {
+  color-scheme: dark;
+  --bg: #0b1222; --panel: #232a36; --text: #f3f4f6;
+  --accent: #4cc2ff; --on-accent: #001a2b; --ok: #6ccb5f; --warn: #fce100; --bad: #ff99a4;
+  --c-wsl: #c79bff; --c-vm: #ffab70;
+  --glass: color-mix(in srgb, var(--panel) 52%, transparent); --glass-strong: color-mix(in srgb, var(--panel) 66%, transparent);
+  --glass-line: rgba(255,255,255,.09);
+  --shadow: 0 8px 30px rgba(0,0,0,.35);
+  --wall-1: #1d4fd6; --wall-2: #6a2ad6; --wall-3: #0b7f8f;
+}
+:root[data-theme="glass"] body { background: radial-gradient(1100px 760px at 12% 0%, var(--wall-1) 0, transparent 62%), radial-gradient(900px 700px at 92% 28%, var(--wall-2) 0, transparent 60%), radial-gradient(1100px 820px at 45% 108%, var(--wall-3) 0, transparent 62%), var(--bg); background-attachment: fixed; }
+:root[data-theme="glass"].fx-blobs body::before { content: ""; position: fixed; inset: -25%; z-index: 0; pointer-events: none; will-change: transform;
+  background: radial-gradient(28% 30% at 25% 30%, color-mix(in srgb, var(--wall-1) 80%, transparent) 0, transparent 70%), radial-gradient(24% 26% at 72% 64%, color-mix(in srgb, var(--wall-2) 75%, transparent) 0, transparent 70%), radial-gradient(22% 24% at 60% 20%, color-mix(in srgb, var(--wall-3) 70%, transparent) 0, transparent 70%);
+  filter: blur(30px); animation: glass-drift 46s ease-in-out infinite alternate; }
+@keyframes glass-drift { 0% { transform: translate(0, 0) rotate(0deg) scale(1); } 50% { transform: translate(6%, -4%) rotate(18deg) scale(1.08); } 100% { transform: translate(-5%, 5%) rotate(-12deg) scale(.96); } }
+:root[data-theme="glass"] nav, :root[data-theme="glass"] .card, :root[data-theme="glass"] .panel, :root[data-theme="glass"] .rule, :root[data-theme="glass"] .dns-srv,
+:root[data-theme="glass"] table, :root[data-theme="glass"] .logs, :root[data-theme="glass"] .type, :root[data-theme="glass"] .theme-card, :root[data-theme="glass"] .empty,
+:root[data-theme="glass"] .ctx-menu, :root[data-theme="glass"] .modal, :root[data-theme="glass"] .toast {
+  background: var(--glass); backdrop-filter: blur(28px) saturate(1.6); -webkit-backdrop-filter: blur(28px) saturate(1.6); border-color: var(--glass-line); }
+:root[data-theme="glass"] nav { background: var(--glass-strong); border-right: 1px solid var(--glass-line); }
+:root[data-theme="glass"] .modal { background: var(--glass-strong); box-shadow: 0 30px 80px rgba(0,0,0,.28); border: 1px solid var(--glass-line); }
+:root[data-theme="glass"] header.top, :root[data-theme="glass"] .savebar { background: color-mix(in srgb, var(--panel) 34%, transparent); backdrop-filter: blur(24px) saturate(1.5); border-color: var(--glass-line); }
+:root[data-theme="glass"] nav a { position: relative; }
+:root[data-theme="glass"] nav a.active { background: color-mix(in srgb, var(--text) 7%, transparent); color: var(--text); }
+:root[data-theme="glass"] nav a.active::before { content: ""; position: absolute; left: 0; top: 25%; bottom: 25%; width: 3px; border-radius: 3px; background: var(--accent); }
+:root[data-theme="glass"] .btn:not(.primary):not(.danger-fill):not(.link) { background: color-mix(in srgb, var(--panel) 62%, transparent); border-color: var(--glass-line); }
+:root[data-theme="glass"] .btn:not(.primary):not(.danger-fill):not(.link):hover { background: color-mix(in srgb, var(--panel) 80%, transparent); }
+:root[data-theme="glass"] input[type=text], :root[data-theme="glass"] input[type=number], :root[data-theme="glass"] input[type=password], :root[data-theme="glass"] select, :root[data-theme="glass"] textarea {
+  background: color-mix(in srgb, var(--panel) 66%, transparent); border-color: var(--glass-line); border-bottom-color: color-mix(in srgb, var(--text) 30%, transparent); }
+:root[data-theme="glass"] input:focus, :root[data-theme="glass"] select:focus, :root[data-theme="glass"] textarea:focus { box-shadow: inset 0 -2px 0 var(--accent); border-color: var(--glass-line); }
+:root[data-theme="glass"] th { background: color-mix(in srgb, var(--panel) 40%, transparent); }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 </style>
+<!--vpner-look-->
+<script>
+// Theme and mode before the first paint (see apApply).
+(function () {
+  var r = document.documentElement, l = window.VPNER_LOOK;
+  r.dataset.mode = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  if (!l) return;
+  r.dataset.theme = l.t || "standard";
+  if (l.m === "light" || l.m === "dark") r.dataset.mode = l.m;
+  if (l.css) r.style.cssText = l.css;
+})();
+</script>
 </head>
 <body>
 <div class="app" id="app">
   <div class="scrim" id="scrim"></div>
   <nav id="nav" aria-label="Разделы">
-    <div class="brand"><svg viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#2f6fed"/><path d="M9 10l7 13 7-13" stroke="white" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>VPNer</div>
+    <div class="brand"><svg viewBox="0 0 32 32"><rect width="32" height="32" rx="8"/><path d="M9 10l7 13 7-13" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>VPNer</div>
     <a data-tab="conns">Подключения <span class="count" id="cnt-conns"></span></a>
     <a data-tab="rules">Правила <span class="count" id="cnt-rules"></span></a>
     <a data-tab="dns">DNS</a>
     <a data-tab="live">Соединения</a>
     <a data-tab="check">Проверка утечек</a>
     <a data-tab="logs">Журнал</a>
+    <a data-tab="look">Оформление</a>
     <a data-tab="settings">Настройки</a>
     <div class="spacer"></div>
     <a class="quit" id="quit">Выход</a>
@@ -419,6 +626,7 @@ const ICON = {
   top: svg('<path d="M3.5 3h9M4 11l4-4 4 4"/>'),
   bottom: svg('<path d="M3.5 13h9M4 5l4 4 4-4"/>'),
   close: svg('<path d="M4 4l8 8M12 4l-8 8"/>'),
+  reset: svg('<path d="M3 8a5 5 0 1 0 1.5-3.5M3 3v2.5h2.5"/>'),
   trash: svg('<path d="M2.5 4.5h11M6.5 2.5h3M4 4.5l.6 8.1a1 1 0 0 0 1 .9h4.8a1 1 0 0 0 1-.9l.6-8.1M6.7 7v4M9.3 7v4"/>'),
 };
 // ---------- burger menu ----------
@@ -439,7 +647,12 @@ addEventListener("resize", () => {
 document.addEventListener("keydown", e => { if (e.key === "Escape") setNav(false); });
 
 // ---------- data loading ----------
-async function loadConfig() { S.cfg = await api("GET", "/api/config"); if (!S.rulesDirty) S.rulesDraft = structuredClone(S.cfg.rules || []); }
+let apReady = false;
+async function loadConfig() {
+  S.cfg = await api("GET", "/api/config");
+  if (!S.rulesDirty) S.rulesDraft = structuredClone(S.cfg.rules || []);
+  if (!apReady) { apReady = true; apLoad(); } else apApply();
+}
 async function boot() {
   try {
     [S.providers, S.info] = await Promise.all([api("GET", "/api/providers"), api("GET", "/api/info")]);
@@ -524,6 +737,359 @@ function showQuitConfirm() {
 }
 async function restoreNet() { await act(() => api("POST", "/api/restore"), "Сеть восстановлена"); }
 
+// ---------- appearance: themes, user values, variables, effects ----------
+// Every visual parameter is a CSS variable. Its value comes, by priority,
+// from the user's choice, then the theme (its special value), then the
+// common value. User values survive theme changes.
+const THEMES = [
+  { id: "standard", name: "Стандарт", desc: "Спокойный интерфейс в стиле Windows", modes: ["light", "dark"], fx: [] },
+  { id: "cli", name: "CLI / терминал", desc: "Моноширинный шрифт, рамки, бегущие символы и помехи", modes: ["dark"], fx: [
+    { id: "rain", label: "Бегущие символы", help: "Символы стекают по фону окна, как в терминале из фильмов" },
+    { id: "glitch", label: "Помехи", help: "Редкие сбои изображения: дрожание, цветовые искажения, шум" },
+    { id: "scan", label: "Развёртка", help: "Строки, мерцание и бегущий луч, как у старого монитора" },
+    { id: "type", label: "Печать и расшифровка", help: "Заголовки набираются по буквам, пункты меню «расшифровываются» при наведении" },
+  ] },
+  { id: "glass", name: "Стекло", desc: "Полупрозрачные панели и размытие в духе Windows 11", modes: ["light", "dark"], fx: [
+    { id: "blobs", label: "Живой фон", help: "Цветные пятна медленно плывут за стеклом" },
+  ] },
+];
+const FONTS = [
+  { id: "segoe", label: "Segoe UI — системный", css: '"Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif' },
+  { id: "bahnschrift", label: "Bahnschrift — футуристичный", css: 'Bahnschrift, "Segoe UI", sans-serif' },
+  { id: "georgia", label: "Georgia — с засечками", css: 'Georgia, "Times New Roman", serif' },
+  { id: "times", label: "Times New Roman — классика", css: '"Times New Roman", Times, serif' },
+  { id: "candara", label: "Candara — мягкий", css: 'Candara, "Segoe UI", sans-serif' },
+  { id: "verdana", label: "Verdana — крупный", css: 'Verdana, Geneva, sans-serif' },
+  { id: "trebuchet", label: "Trebuchet MS", css: '"Trebuchet MS", "Segoe UI", sans-serif' },
+  { id: "cascadia", label: "Cascadia Mono — терминал", css: '"Cascadia Mono", "Cascadia Code", Consolas, monospace' },
+  { id: "consolas", label: "Consolas — моноширинный", css: 'Consolas, "Courier New", monospace' },
+  { id: "courier", label: "Courier New — печатная машинка", css: '"Courier New", Courier, monospace' },
+  { id: "comic", label: "Comic Sans MS — шуточный", css: '"Comic Sans MS", "Comic Sans", cursive' },
+];
+const AP_PARAMS = [
+  { id: "accent", css: "--accent", kind: "color", label: "Акцентный цвет", help: "Кнопки, выделение, ссылки" },
+  { id: "bg", css: "--bg", kind: "color", label: "Фон окна" },
+  { id: "panel", css: "--panel", kind: "color", label: "Фон панелей и карточек" },
+  { id: "text", css: "--text", kind: "color", label: "Текст", help: "Второстепенный текст и линии подстраиваются сами" },
+  { id: "on-accent", css: "--on-accent", kind: "color", label: "Текст на акцентных кнопках" },
+  { id: "radius", css: "--radius", kind: "length", min: 0, max: 24, label: "Скругление", help: "Карточки и панели" },
+  { id: "font", css: "--font", kind: "font", label: "Шрифт" },
+  { id: "mono", css: "--mono", kind: "font", label: "Шрифт кода и адресов" },
+  // special: own meaning, own value; "common" makes them follow a general one
+  { id: "ok", css: "--ok", kind: "color", special: true, common: "accent", label: "Статус «Подключено»", help: "И всё, что означает успех" },
+  { id: "warn", css: "--warn", kind: "color", special: true, common: "accent", label: "Статус «Ожидание»", help: "Подключается, ждёт подтверждения, в очереди" },
+  { id: "bad", css: "--bad", kind: "color", special: true, common: "accent", label: "Ошибки и удаление" },
+  { id: "c-native", css: "--c-native", kind: "color", special: true, common: "accent", label: "Метка «Встроенный»" },
+  { id: "c-wsl", css: "--c-wsl", kind: "color", special: true, common: "accent", label: "Метка «Контейнер WSL»" },
+  { id: "c-vm", css: "--c-vm", kind: "color", special: true, common: "accent", label: "Метка «Виртуалка»" },
+  { id: "r-btn", css: "--r-btn", kind: "length", min: 0, max: 20, special: true, common: "radius", label: "Скругление кнопок и полей" },
+  { id: "r-modal", css: "--r-modal", kind: "length", min: 0, max: 32, special: true, common: "radius", label: "Скругление окон" },
+];
+const CONN_PALETTE = ["#3b82f6", "#a855f7", "#f97316", "#14b8a6", "#ec4899", "#eab308", "#22c55e", "#ef4444", "#06b6d4", "#8b5cf6"];
+const KIND_TITLE = { color: "Цвет", length: "Скругление", font: "Шрифт" };
+const AP_DEFAULT = () => ({ theme: "standard", mode: "system", values: {}, vars: [], fx: {} });
+let AP = AP_DEFAULT();
+
+function connParams() {
+  return (S.cfg ? S.cfg.connections || [] : []).map((c, i) => ({ id: "conn:" + c.id, css: "--conn-" + c.id, kind: "color", special: true, common: "accent",
+    label: c.name, auto: CONN_PALETTE[i % CONN_PALETTE.length] }));
+}
+const apParam = id => AP_PARAMS.find(p => p.id === id) || connParams().find(p => p.id === id);
+const apTheme = () => THEMES.find(t => t.id === AP.theme) || THEMES[0];
+const fxOn = id => AP.fx[id] !== false && !matchMedia("(prefers-reduced-motion: reduce)").matches;
+function apValueCss(kind, v) {
+  if (kind === "length") return Math.max(0, +v || 0) + "px";
+  if (kind === "font") return (FONTS.find(f => f.id === v) || FONTS[0]).css;
+  return /^#[0-9a-f]{3,8}$/i.test(v || "") ? v : "#888888";
+}
+function apEffectiveMode() {
+  const t = apTheme();
+  if (t.modes.length === 1) return t.modes[0];
+  if (AP.mode === "light" || AP.mode === "dark") return AP.mode;
+  return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+// apApply puts the theme, the mode and every user value on <html>.
+function apApply() {
+  const root = document.documentElement, props = {};
+  for (const v of AP.vars) props["--uv-" + v.id] = apValueCss(v.kind, v.value);
+  for (const p of [...AP_PARAMS, ...connParams()]) {
+    const c = AP.values[p.id];
+    const m = c ? c.m : "theme";
+    let val = null;
+    if (m === "common" && p.common) val = `var(${apParam(p.common).css})`;
+    else if (m === "own") val = apValueCss(p.kind, c.v);
+    else if (m === "var" && AP.vars.some(v => v.id === c.var)) val = `var(--uv-${c.var})`;
+    else if (p.auto) val = p.auto;
+    if (val) props[p.css] = val;
+  }
+  root.dataset.theme = apTheme().id;
+  root.dataset.mode = apEffectiveMode();
+  root.style.cssText = Object.entries(props).map(([k, v]) => `${k}: ${v}`).join("; ");
+  // what the server puts into the page on the next start, so the window
+  // opens in its theme right away
+  const t = apTheme();
+  AP.look = { t: t.id, m: t.modes.length === 1 ? t.modes[0] : AP.mode, css: root.style.cssText };
+  fxUpdate();
+}
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => apApply());
+function apLoad() {
+  const a = S.cfg && S.cfg.appearance;
+  AP = Object.assign(AP_DEFAULT(), a && typeof a === "object" ? a : {});
+  AP.values = AP.values || {}; AP.vars = AP.vars || []; AP.fx = AP.fx || {};
+  apApply();
+}
+let apSaveTimer = null;
+function apSave() {
+  apApply();
+  clearTimeout(apSaveTimer);
+  apSaveTimer = setTimeout(() => api("PUT", "/api/appearance", AP).then(() => { if (S.cfg) S.cfg.appearance = structuredClone(AP); }).catch(e => toast(e.message, true)), 350);
+}
+
+// ---------- effects ----------
+const FX = { rain: null, glitch: null };
+function fxUpdate() {
+  const root = document.documentElement, t = apTheme().id;
+  const on = id => apTheme().fx.some(f => f.id === id) && fxOn(id);
+  root.classList.toggle("fx-scan", t === "cli" && on("scan"));
+  root.classList.toggle("fx-glitchable", t === "cli" && on("glitch"));
+  root.classList.toggle("fx-blobs", t === "glass" && on("blobs"));
+  if (t === "cli" && on("rain")) rainStart(); else rainStop();
+  if (t === "cli" && on("glitch")) glitchStart(); else glitchStop();
+}
+function fxLayers() {
+  if ($("#fx-rain")) return;
+  document.body.insertAdjacentHTML("afterbegin", `<canvas id="fx-rain" aria-hidden="true"></canvas><div id="fx-scan" aria-hidden="true"></div><div id="fx-noise" aria-hidden="true"></div>`);
+}
+const RAIN_CHARS = "アイウエオカキクケコサシスセソタチツテトナニヌネノ0123456789ABCDEF$#%&*+=<>/\\|{}[]:;ЖФЫЩЭЮ";
+function rainStart() {
+  fxLayers();
+  document.documentElement.classList.add("fx-rain");
+  if (FX.rain) return;
+  const cv = $("#fx-rain"), ctx = cv.getContext("2d"), size = 15;
+  let cols = [], w = 0, h = 0, last = 0;
+  const resize = () => {
+    const dpr = Math.min(2, devicePixelRatio || 1);
+    w = innerWidth; h = innerHeight;
+    cv.width = w * dpr; cv.height = h * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const n = Math.ceil(w / size);
+    cols = Array.from({ length: n }, (_, i) => cols[i] || { y: (Math.random() * 1.3 - .3) * h / size, v: .4 + Math.random() * .9 }); // y in rows
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--bg"); ctx.fillRect(0, 0, w, h);
+  };
+  resize();
+  const frame = t => {
+    FX.rain.raf = requestAnimationFrame(frame);
+    if (document.hidden || t - last < (document.hasFocus() ? 55 : 160)) return; // ~18 fps, slower in the background
+    last = t;
+    const cs = getComputedStyle(document.documentElement);
+    const bg = cs.getPropertyValue("--bg").trim(), accent = cs.getPropertyValue("--accent").trim(), text = cs.getPropertyValue("--text").trim();
+    ctx.globalAlpha = .14; ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h); ctx.globalAlpha = 1;
+    ctx.font = `${size - 2}px ${cs.getPropertyValue("--mono")}`;
+    cols.forEach((c, i) => {
+      const ch = RAIN_CHARS[(Math.random() * RAIN_CHARS.length) | 0];
+      const x = i * size, y = c.y * size;
+      ctx.fillStyle = text; ctx.globalAlpha = .9; ctx.fillText(ch, x, y);
+      ctx.fillStyle = accent; ctx.globalAlpha = .55; ctx.fillText(RAIN_CHARS[(Math.random() * RAIN_CHARS.length) | 0], x, y - size);
+      ctx.globalAlpha = 1;
+      c.y += c.v;
+      if (y > h + size * 4 && Math.random() > .975) { c.y = Math.random() * -20; c.v = .4 + Math.random() * .9; }
+    });
+  };
+  FX.rain = { raf: requestAnimationFrame(frame), resize };
+  addEventListener("resize", resize);
+}
+function rainStop() {
+  document.documentElement.classList.remove("fx-rain");
+  if (!FX.rain) return;
+  cancelAnimationFrame(FX.rain.raf); removeEventListener("resize", FX.rain.resize); FX.rain = null;
+}
+function glitchStart() {
+  fxLayers();
+  if (FX.glitch) return;
+  const burst = () => {
+    const root = document.documentElement;
+    if (!document.hidden && document.hasFocus() && !RD) {
+      root.classList.add("fx-glitch");
+      if (Math.random() < .6) scrambleOnce($("#view h2") || $(".brand"), 260);
+      setTimeout(() => root.classList.remove("fx-glitch"), 140 + Math.random() * 280);
+      if (Math.random() < .35) setTimeout(() => { root.classList.add("fx-glitch"); setTimeout(() => root.classList.remove("fx-glitch"), 90); }, 420);
+    }
+    FX.glitch = setTimeout(burst, 5000 + Math.random() * 11000);
+  };
+  FX.glitch = setTimeout(burst, 2500);
+}
+function glitchStop() { clearTimeout(FX.glitch); FX.glitch = null; document.documentElement.classList.remove("fx-glitch"); }
+document.addEventListener("visibilitychange", () => document.documentElement.classList.toggle("fx-paused", document.hidden));
+
+// Text effects of the CLI theme: headings type themselves, menu items
+// "decrypt" on hover. Only text nodes are touched, never markup.
+const SCRAMBLE = "!<>-_\\/[]{}—=+*^?#01アカサ";
+function scrambleOnce(el, ms) {
+  if (!el || el.dataset.scrambling) return;
+  const node = [...el.childNodes].find(n => n.nodeType === 3 && n.textContent.trim());
+  if (!node) return;
+  const orig = node.textContent; el.dataset.scrambling = "1";
+  const start = performance.now();
+  const step = t => {
+    const k = Math.min(1, (t - start) / ms), keep = Math.floor(orig.length * k);
+    node.textContent = orig.slice(0, keep) + [...orig.slice(keep)].map(ch => ch === " " ? " " : SCRAMBLE[(Math.random() * SCRAMBLE.length) | 0]).join("");
+    if (k < 1) requestAnimationFrame(step); else { node.textContent = orig; delete el.dataset.scrambling; }
+  };
+  requestAnimationFrame(step);
+}
+let typedTab = null;
+function fxTypeHeading() {
+  if (apTheme().id !== "cli" || !fxOn("type") || typedTab === S.tab) return;
+  typedTab = S.tab;
+  const h = $("#view h2");
+  if (!h || h.children.length) return;
+  const full = h.textContent; let n = 0;
+  h.textContent = "";
+  const tick = () => { h.textContent = full.slice(0, ++n); if (n < full.length && h.isConnected) setTimeout(tick, 22 + Math.random() * 30); };
+  tick();
+}
+document.addEventListener("mouseover", e => {
+  const a = e.target.closest && e.target.closest("nav a");
+  if (a && !a.contains(e.relatedTarget) && apTheme().id === "cli" && fxOn("type")) scrambleOnce(a, 320);
+});
+
+// ---------- «Оформление» tab ----------
+function apSwatch(p) {
+  return `<span class="swatch ${p.kind}" style="--sw: var(${p.css})" aria-hidden="true">${p.kind === "font" ? "Аа" : ""}</span>`;
+}
+// apCurrent reads the value a parameter has right now (to start editing it).
+function apCurrent(p) {
+  const cs = getComputedStyle(document.documentElement), raw = cs.getPropertyValue(p.css).trim();
+  if (p.kind === "length") { const probe = document.createElement("div"); probe.style.width = `var(${p.css})`; probe.style.position = "absolute"; document.body.appendChild(probe); const px = Math.round(probe.getBoundingClientRect().width); probe.remove(); return String(px); }
+  if (p.kind === "font") { const f = FONTS.find(f => f.css.split(",")[0].replace(/"/g, "").trim() === raw.split(",")[0].replace(/"/g, "").trim()); return f ? f.id : "segoe"; }
+  const probe = document.createElement("div"); probe.style.color = `var(${p.css})`; document.body.appendChild(probe);
+  const m = getComputedStyle(probe).color.match(/[\d.]+/g) || [128, 128, 128]; probe.remove();
+  return "#" + m.slice(0, 3).map(x => (+x | 0).toString(16).padStart(2, "0")).join("");
+}
+function apEditor(kind, v, on) {
+  if (kind === "color") return `<input type="color" class="picker" value="${esc(v)}" ${on}="this"><input type="text" class="hex" value="${esc(v)}" spellcheck="false" ${on}="this">`;
+  if (kind === "length") return `<input type="range" min="0" max="32" value="${esc(v)}" ${on}="this"><span class="num">${esc(v)} px</span>`;
+  return `<select ${on}="this">${FONTS.map(f => `<option value="${f.id}" ${f.id === v ? "selected" : ""} style="font-family:${esc(f.css)}">${esc(f.label)}</option>`).join("")}</select>`;
+}
+function apRow(p) {
+  const c = AP.values[p.id] || { m: "theme" };
+  const vars = AP.vars.filter(v => v.kind === p.kind);
+  const modes = [["theme", p.special ? "Как в теме" : "Из темы"]];
+  if (p.common) modes.push(["common", "Общее: " + apParam(p.common).label.toLowerCase()]);
+  modes.push(["own", "Своё значение"]);
+  modes.push(["var", "Моя переменная"]);
+  let val = "";
+  if (c.m === "own") val = apEditor(p.kind, c.v, "data-ap-own");
+  else if (c.m === "var") val = vars.length
+    ? `<select data-ap-var>${vars.map(v => `<option value="${v.id}" ${v.id === c.var ? "selected" : ""}>${esc(v.name)}</option>`).join("")}</select>`
+    : `<span class="hint">Нет переменных: «${KIND_TITLE[p.kind]}» — создайте ниже</span>`;
+  else if (c.m === "common") val = `<span class="hint">следует за общим значением</span>`;
+  else val = `<span class="hint">${p.auto ? "автоматический цвет" : "значение темы «" + esc(apTheme().name) + "»"}</span>`;
+  return `<div class="ap-row" data-p="${esc(p.id)}">
+    <div class="ap-label"><b>${esc(p.label)}</b>${p.help ? `<small>${esc(p.help)}</small>` : ""}</div>
+    ${apSwatch(p)}
+    <select class="ap-mode" aria-label="Откуда брать значение">${modes.map(([m, t]) => `<option value="${m}" ${m === c.m ? "selected" : ""}>${esc(t)}</option>`).join("")}</select>
+    <div class="ap-val">${val}</div>
+    <button class="icon-btn" title="Сбросить к значению темы" aria-label="Сбросить" ${c.m === "theme" ? "disabled" : ""} data-ap-reset>${ICON.reset}</button>
+  </div>`;
+}
+function renderAppearance() {
+  const t = apTheme(), eff = apEffectiveMode();
+  const prev = th => {
+    const mode = th.modes.includes(eff) ? eff : th.modes[0];
+    return `<div class="th-prev" data-theme="${th.id}" data-mode="${mode}" aria-hidden="true"><div class="p-nav"><i class="on"></i><i></i><i></i><i></i></div>
+      <div class="p-main"><div class="p-card"><b>Подключения</b><div class="p-row"><span class="p-dot"></span><span>Cisco</span></div><span class="p-btn">Включить</span></div></div></div>`;
+  };
+  const general = AP_PARAMS.filter(p => !p.special), special = AP_PARAMS.filter(p => p.special), conns = connParams();
+  let h = `<h2>Оформление</h2><p class="lead">Тема меняет весь облик программы. Любой цвет, скругление и шрифт можно задать вручную или привязать к своей переменной — ваши значения сохраняются и при смене темы.</p>
+    <div class="panel"><h3>Тема</h3><div class="themes">${THEMES.map(th => `<button class="theme-card ${th.id === t.id ? "on" : ""}" data-th="${th.id}" aria-pressed="${th.id === t.id}">${prev(th)}<span class="tc-info"><b>${esc(th.name)}</b><small>${esc(th.desc)}</small></span></button>`).join("")}</div></div>
+    <div class="panel"><h3>Режим</h3>
+      <div class="seg" id="ap-mode">${[["system", "Как в Windows"], ["light", "Светлая"], ["dark", "Тёмная"]].map(([m, l]) => `<button data-m="${m}" class="${AP.mode === m ? "on" : ""}" ${t.modes.length === 1 ? "disabled" : ""}>${l}</button>`).join("")}</div>
+      ${t.modes.length === 1 ? `<p class="help" style="color:var(--muted);font-size:12.5px;margin:8px 0 0">У темы «${esc(t.name)}» только ${t.modes[0] === "dark" ? "тёмный" : "светлый"} вариант.</p>` : ""}
+      ${t.fx.length ? `<div class="fx-list"><div class="ap-sub">Эффекты темы</div>${t.fx.map(f => `<label class="check"><input type="checkbox" class="switch" data-fx="${f.id}" ${AP.fx[f.id] !== false ? "checked" : ""}><span><b style="font-size:13px">${esc(f.label)}</b><br><span style="color:var(--muted);font-size:12.5px">${esc(f.help)}</span></span></label>`).join("")}
+        ${matchMedia("(prefers-reduced-motion: reduce)").matches ? `<p class="help" style="color:var(--warn);font-size:12.5px;margin:4px 0 0">В Windows включено «Уменьшение анимации» — эффекты не показываются.</p>` : ""}</div>` : ""}
+    </div>
+    <div class="panel"><h3>Основные</h3><div class="ap-rows">${general.map(apRow).join("")}</div></div>
+    <div class="panel"><h3>Особые элементы</h3><p class="help" style="color:var(--muted);font-size:12.5px;margin:-4px 0 6px">У этих элементов свой смысл и своё значение, независимое от общих настроек. Его можно оставить как в теме, привязать к общему, задать вручную или взять из своей переменной.</p>
+      <div class="ap-rows">${special.map(apRow).join("")}</div>
+      ${conns.length ? `<div class="ap-sub">Цвета подключений</div><p class="help" style="color:var(--muted);font-size:12.5px;margin:0 0 4px">Метка подключения в списке, в правилах, в соединениях и в журнале.</p><div class="ap-rows">${conns.map(apRow).join("")}</div>` : ""}
+    </div>
+    <div class="panel"><h3>Мои переменные</h3><p class="help" style="color:var(--muted);font-size:12.5px;margin:-4px 0 8px">Сохраните значение под своим именем и назначайте его любым параметрам. Измените переменную — изменится везде, где она выбрана.</p>
+      <div class="ap-rows" id="ap-vars">${AP.vars.length ? AP.vars.map(apVarRow).join("") : `<p class="help" style="color:var(--muted);font-size:12.5px;margin:0">Переменных пока нет.</p>`}</div>
+      <div class="row" style="margin-top:10px"><button class="btn" data-addvar="color">＋ Цвет</button><button class="btn" data-addvar="length">＋ Скругление</button><button class="btn" data-addvar="font">＋ Шрифт</button></div>
+    </div>
+    <div class="row"><button class="btn danger" id="ap-reset-all">Сбросить всё оформление</button></div>`;
+  $("#view").innerHTML = h;
+  apWire();
+}
+function apVarRow(v) {
+  const used = Object.values(AP.values).filter(c => c.m === "var" && c.var === v.id).length;
+  return `<div class="ap-row" data-var="${esc(v.id)}">
+    <div class="ap-label"><input type="text" value="${esc(v.name)}" data-var-name aria-label="Название переменной"><small>${KIND_TITLE[v.kind]} · ${used ? "используется: " + used : "пока нигде не используется"}</small></div>
+    <span class="swatch ${v.kind}" style="--sw: var(--uv-${v.id})" aria-hidden="true">${v.kind === "font" ? "Аа" : ""}</span>
+    <span></span>
+    <div class="ap-val">${apEditor(v.kind, v.value, "data-var-val")}</div>
+    <button class="icon-btn danger" title="Удалить переменную" aria-label="Удалить переменную" data-var-del>${ICON.trash}</button>
+  </div>`;
+}
+function apWire() {
+  const view = $("#view");
+  view.querySelectorAll("[data-th]").forEach(b => b.onclick = () => { AP.theme = b.dataset.th; typedTab = null; apSave(); renderAppearance(); });
+  view.querySelectorAll("#ap-mode [data-m]").forEach(b => b.onclick = () => { AP.mode = b.dataset.m; apSave(); renderAppearance(); });
+  view.querySelectorAll("[data-fx]").forEach(el => el.onchange = () => { AP.fx[el.dataset.fx] = el.checked; apSave(); });
+  view.querySelectorAll(".ap-row[data-p]").forEach(row => {
+    const p = apParam(row.dataset.p);
+    const set = c => { if (c) AP.values[p.id] = c; else delete AP.values[p.id]; apSave(); };
+    row.querySelector(".ap-mode").onchange = e => {
+      const m = e.target.value;
+      if (m === "theme") set(null);
+      else if (m === "own") set({ m, v: apCurrent(p) });
+      else if (m === "var") set({ m, var: (AP.vars.find(v => v.kind === p.kind) || {}).id });
+      else set({ m });
+      row.outerHTML = apRow(p); apWire();
+    };
+    row.querySelector("[data-ap-reset]").onclick = () => { set(null); renderAppearance(); };
+    const vs = row.querySelector("[data-ap-var]");
+    if (vs) vs.onchange = () => set({ m: "var", var: vs.value });
+    apBindEditor(row, "data-ap-own", p.kind, v => set({ m: "own", v }));
+  });
+  view.querySelectorAll(".ap-row[data-var]").forEach(row => {
+    const v = AP.vars.find(x => x.id === row.dataset.var);
+    row.querySelector("[data-var-name]").onchange = e => { v.name = e.target.value.trim() || v.name; apSave(); };
+    apBindEditor(row, "data-var-val", v.kind, val => { v.value = val; apSave(); });
+    row.querySelector("[data-var-del]").onclick = async () => {
+      const used = Object.values(AP.values).filter(c => c.m === "var" && c.var === v.id).length;
+      if (used && !await ask(`Переменная «${v.name}» используется в ${used} параметр(ах). Они сохранят её текущее значение как своё.`, { title: "Удалить переменную?", ok: "Удалить", danger: true })) return;
+      for (const c of Object.values(AP.values)) if (c.m === "var" && c.var === v.id) { c.m = "own"; c.v = v.value; delete c.var; }
+      AP.vars = AP.vars.filter(x => x !== v); apSave(); renderAppearance();
+    };
+  });
+  view.querySelectorAll("[data-addvar]").forEach(b => b.onclick = () => {
+    const kind = b.dataset.addvar, n = AP.vars.filter(v => v.kind === kind).length + 1;
+    const value = kind === "color" ? apCurrent(apParam("accent")) : kind === "length" ? apCurrent(apParam("radius")) : apCurrent(apParam("font"));
+    AP.vars.push({ id: "v" + Math.random().toString(36).slice(2, 8), name: `Мой ${KIND_TITLE[kind].toLowerCase()} ${n}`, kind, value });
+    apSave(); renderAppearance();
+  });
+  $("#ap-reset-all").onclick = async () => {
+    if (!await ask("Тема, режим, все свои значения и переменные вернутся к стандартным.", { title: "Сбросить оформление?", ok: "Сбросить", danger: true })) return;
+    AP = AP_DEFAULT(); apSave(); renderAppearance();
+  };
+}
+// apBindEditor wires a value editor (color picker + hex, range, font list).
+function apBindEditor(row, attr, kind, onValue) {
+  const els = [...row.querySelectorAll(`[${attr}]`)];
+  if (!els.length) return;
+  if (kind === "color") {
+    const [picker, hex] = els;
+    picker.oninput = () => { hex.value = picker.value; onValue(picker.value); };
+    hex.onchange = () => { const v = hex.value.trim(); if (/^#[0-9a-f]{6}$/i.test(v)) { picker.value = v; onValue(v); } else hex.value = picker.value; };
+  } else if (kind === "length") {
+    const [range] = els, num = row.querySelector(".num");
+    range.oninput = () => { num.textContent = range.value + " px"; onValue(range.value); };
+  } else {
+    els[0].onchange = () => onValue(els[0].value);
+  }
+}
+
 // ---------- tabs ----------
 $$("nav a[data-tab]").forEach(a => a.onclick = () => { setTab(a.dataset.tab); setNav(false); });
 async function setTab(t) {
@@ -538,7 +1104,8 @@ async function setTab(t) {
 }
 function render() {
   if (!S.cfg) return;
-  ({ conns: renderConns, rules: renderRules, dns: renderDNS, live: renderLive, check: renderCheck, logs: renderLogs, settings: renderSettings })[S.tab]();
+  ({ conns: renderConns, rules: renderRules, dns: renderDNS, live: renderLive, check: renderCheck, logs: renderLogs, look: renderAppearance, settings: renderSettings })[S.tab]();
+  fxTypeHeading();
 }
 
 // ---------- connections ----------
@@ -563,7 +1130,7 @@ function renderConns() {
       if (v.state === "up" && v.since) kv += `<span>Подключено</span><span>${ago(v.since)}</span>`;
       if (v.vmPassword) kv += `<span>Пароль в ВМ</span><span class="mono" title="Пользователь vpner">${esc(v.vmPassword)}</span>`;
       if (v.localProxy) kv += `<span>Локальный прокси</span><span class="mono" title="HTTP/SOCKS5 без пароля, только для этого компьютера">127.0.0.1:${v.localProxy}</span>`;
-      return `<div class="card ${c.enabled ? "" : "off"}">
+      return `<div class="card cc ${c.enabled ? "" : "off"}" style="--cc: var(--conn-${c.id})">
         <div class="head"><span class="dot ${scls === "muted" ? "" : scls}"></span><div class="name" title="${esc(c.name)}">${esc(c.name)}</div><span class="badge ${rcls}">${esc(rtitle)}</span></div>
         <div class="meta">${esc(v.typeTitle || c.type)} · <span class="state ${scls}">${esc(stitle)}</span></div>
         ${v.detail && v.state !== "up" ? `<div class="detail">${esc(v.detail)}</div>` : ""}
@@ -887,7 +1454,7 @@ function renderRules() {
         ${r.kind === "process" || r.kind === "process-path" ? `<button class="btn small" onclick="pickProcess(${i})">Выбрать из запущенных…</button>` : ""}
         <div class="hint">${esc(k[3])}${r.kind === "ip-cidr" || r.kind === "geoip" ? ` <label class="check" style="display:inline-flex;align-items:center;margin:4px 0 0"><input type="checkbox" class="switch" ${r.resolve ? "checked" : ""} onchange="ruleSet(${i},'resolve',this.checked)" style="margin:0"> проверять и домены через DNS</label>` : ""}</div></div>
       <div class="r-arrow" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 14 14"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <div class="r-target"><span class="via">через</span><select aria-label="Куда направлять" onchange="ruleSet(${i},'target',this.value)">${targetOptions(r.target)}</select></div>
+      <div class="r-target"><span class="cc-dot" style="--cc: ${(S.cfg.connections || []).some(c => c.id === r.target) ? `var(--conn-${r.target})` : "transparent"}" aria-hidden="true"></span><span class="via">через</span><select aria-label="Куда направлять" onchange="ruleSet(${i},'target',this.value)">${targetOptions(r.target)}</select></div>
       <div class="r-actions">
         <button class="icon-btn" title="В самый верх" aria-label="В самый верх" ${i === 0 ? "disabled" : ""} onclick="moveRuleTo(${i},0)">${ICON.top}</button>
         <button class="icon-btn" title="Поднять выше" aria-label="Поднять выше" ${i === 0 ? "disabled" : ""} onclick="moveRule(${i},-1)">${ICON.up}</button>
@@ -1208,7 +1775,7 @@ function drawLive() {
   el.innerHTML = `<div class="help" style="color:var(--muted);margin-bottom:8px">Всего: ↑ ${fmtBytes((S.live && S.live.uploadTotal) || 0)} · ↓ ${fmtBytes((S.live && S.live.downloadTotal) || 0)} · соединений: ${rows.length}</div>
     <div class="table-wrap"><table><thead><tr><th>Программа</th><th>Куда</th><th>Через</th><th>Правило</th><th style="text-align:right">↑ / ↓</th><th></th></tr></thead><tbody>
     ${rows.slice(0, 400).map(c => `<tr><td>${esc(c.process || "—")}</td><td class="mono">${esc(c.host || c.dest)}${c.host ? `<br><span style="color:var(--muted)">${esc(c.dest)} ${esc(c.network)}</span>` : ` ${esc(c.network)}`}</td>
-      <td><b class="${c.via === "REJECT" ? "verdict leak" : ""}">${esc(c.viaName)}</b></td><td class="mono" style="color:var(--muted)">${esc(c.rule)}</td>
+      <td><span class="row" style="gap:6px;flex-wrap:nowrap">${(S.cfg.connections || []).some(x => x.id === c.via) ? `<span class="cc-dot" style="--cc: var(--conn-${c.via})"></span>` : ""}<b class="${c.via === "REJECT" ? "verdict leak" : ""}">${esc(c.viaName)}</b></span></td><td class="mono" style="color:var(--muted)">${esc(c.rule)}</td>
       <td style="text-align:right;white-space:nowrap">${fmtBytes(c.upload)} / ${fmtBytes(c.download)}</td><td><button class="icon-btn danger" title="Разорвать соединение" aria-label="Разорвать соединение" onclick="api('DELETE','/api/live/${esc(c.id)}')">${ICON.close}</button></td></tr>`).join("")}
     </tbody></table></div>`;
 }
@@ -1264,7 +1831,8 @@ function renderLogs() {
 function logLine(e) {
   const t = new Date(e.time).toLocaleTimeString();
   const nm = ({ app: "app", engine: "engine", agent: "wsl" })[e.source] || ((S.cfg.connections || []).find(c => c.id === e.source) || {}).name || e.source;
-  return `<div class="${e.level}"><span class="t">${t}</span> <span class="src">${esc(nm)}</span> ${esc(e.line)}</div>`;
+  const conn = (S.cfg.connections || []).some(c => c.id === e.source);
+  return `<div class="${e.level}"><span class="t">${t}</span> <span class="src"${conn ? ` style="color: var(--conn-${e.source})"` : ""}>${esc(nm)}</span> ${esc(e.line)}</div>`;
 }
 function appendLog(e) {
   const el = $("#lg"); if (!el || (logSrc && e.source !== logSrc) || e.level === "debug") return;

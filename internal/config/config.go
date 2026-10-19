@@ -31,6 +31,9 @@ type Config struct {
 	Rules       []Rule       `json:"rules"`
 	Settings    Settings     `json:"settings"`
 	DNS         DNS          `json:"dns"`
+	// Appearance is the UI look (theme, colors, fonts, user variables). Only
+	// the interface reads it, so it is kept as opaque JSON.
+	Appearance json.RawMessage `json:"appearance,omitempty"`
 }
 
 // Connection is one VPN/proxy/gateway. Params are type specific and described

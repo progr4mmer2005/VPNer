@@ -26,6 +26,7 @@ type Profile struct {
 	Rules       []config.Rule       `json:"rules"`
 	Settings    *config.Settings    `json:"settings,omitempty"`
 	DNS         *config.DNS         `json:"dns,omitempty"`
+	Appearance  json.RawMessage     `json:"appearance,omitempty"`
 }
 
 // Result is what an import would add. Connection ids are fresh; rule targets
@@ -37,6 +38,7 @@ type Result struct {
 	FinalTarget string              `json:"-"`
 	Settings    *config.Settings    `json:"-"`
 	DNS         *config.DNS         `json:"-"`
+	Appearance  json.RawMessage     `json:"-"`
 	Notes       []string            `json:"notes,omitempty"`
 }
 
@@ -208,6 +210,14 @@ func parseProfile(data string) (*Result, error) {
 		r.Target = mapTarget(r.Target)
 		res.Rules = append(res.Rules, r)
 	}
+	if len(p.Appearance) > 0 && json.Valid(p.Appearance) {
+		// per-connection colors are keyed by connection id
+		a := string(p.Appearance)
+		for old, nid := range idMap {
+			a = strings.ReplaceAll(a, `"conn:`+old+`"`, `"conn:`+nid+`"`)
+		}
+		res.Appearance = json.RawMessage(a)
+	}
 	if p.Settings != nil {
 		s := *p.Settings
 		s.FinalTarget = mapTarget(s.FinalTarget)
@@ -266,7 +276,7 @@ func parseProfile(data string) (*Result, error) {
 
 // Export builds a profile; secrets are included only when asked.
 func Export(cfg *config.Config, withSecrets bool) ([]byte, error) {
-	p := Profile{VPNer: ProfileVersion, Rules: cfg.Rules, Settings: &cfg.Settings, DNS: &cfg.DNS}
+	p := Profile{VPNer: ProfileVersion, Rules: cfg.Rules, Settings: &cfg.Settings, DNS: &cfg.DNS, Appearance: cfg.Appearance}
 	for _, c := range cfg.Connections {
 		c.Params = copyMap(c.Params)
 		c.Secrets = copyMap(c.Secrets)

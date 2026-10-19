@@ -4,6 +4,7 @@
 package web
 
 import (
+	"bytes"
 	"context"
 	"crypto/subtle"
 	_ "embed"
@@ -116,11 +117,30 @@ type connDTO struct {
 	SecretSet map[string]bool `json:"secretSet"`
 }
 
+// page is the UI with the saved theme already in it, so the window opens
+// in its look instead of flashing the standard one first.
+func (s *Server) page() []byte {
+	var a struct {
+		Look *struct {
+			T   string `json:"t"`
+			M   string `json:"m"`
+			CSS string `json:"css"`
+		} `json:"look"`
+	}
+	look := []byte("null")
+	if raw := s.App.Config().Appearance; len(raw) > 0 && json.Unmarshal(raw, &a) == nil && a.Look != nil {
+		if b, err := json.Marshal(a.Look); err == nil { // also escapes <, > and &
+			look = b
+		}
+	}
+	return bytes.Replace(indexHTML, []byte("<!--vpner-look-->"), append(append([]byte("<script>window.VPNER_LOOK = "), look...), []byte(";</script>")...), 1)
+}
+
 func (s *Server) routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Header().Set("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data:")
-		w.Write(indexHTML)
+		w.Write(s.page())
 	})
 
 	mux.HandleFunc("GET /api/state", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, s.App.Snapshot()) })
@@ -132,8 +152,9 @@ func (s *Server) routes(mux *http.ServeMux) {
 			Rules       []config.Rule   `json:"rules"`
 			Settings    config.Settings `json:"settings"`
 			DNS         config.DNS      `json:"dns"`
+			Appearance  json.RawMessage `json:"appearance,omitempty"`
 			DataDir     string          `json:"dataDir"`
-		}{Rules: cfg.Rules, Settings: cfg.Settings, DNS: cfg.DNS, DataDir: s.App.DataDir}
+		}{Rules: cfg.Rules, Settings: cfg.Settings, DNS: cfg.DNS, Appearance: cfg.Appearance, DataDir: s.App.DataDir}
 		for _, c := range cfg.Connections {
 			d := connDTO{Connection: c, SecretSet: map[string]bool{}}
 			for k, v := range c.Secrets {
@@ -291,6 +312,19 @@ func (s *Server) routes(mux *http.ServeMux) {
 			return
 		}
 		writeJSON(w, map[string]string{"text": text})
+	})
+
+	mux.HandleFunc("PUT /api/appearance", func(w http.ResponseWriter, r *http.Request) {
+		b, err := io.ReadAll(io.LimitReader(r.Body, 512<<10))
+		if err != nil {
+			writeErr(w, err)
+			return
+		}
+		if err := s.App.SaveAppearance(b); err != nil {
+			writeErr(w, err)
+			return
+		}
+		writeJSON(w, map[string]bool{"ok": true})
 	})
 
 	mux.HandleFunc("PUT /api/rules", func(w http.ResponseWriter, r *http.Request) {

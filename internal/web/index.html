@@ -208,6 +208,14 @@ label.check input.switch { margin-top: 1px; }
 @keyframes fade-in { from { opacity: 0; } }
 @keyframes pop-in { from { opacity: 0; transform: scale(.97); } }
 @media (prefers-reduced-motion: reduce) { .dialog-bg, .modal.dialog { animation: none; } }
+/* the window's own context menu */
+.ctx-menu { position: fixed; z-index: 90; min-width: 180px; padding: 5px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.28); display: flex; flex-direction: column; }
+.ctx-menu button { display: flex; justify-content: space-between; gap: 24px; border: none; background: none; text-align: left; padding: 7px 10px; border-radius: 6px; cursor: pointer; color: var(--text); font-size: 13px; }
+.ctx-menu button:hover:not(:disabled), .ctx-menu button:focus-visible { background: var(--panel2); outline: none; }
+.ctx-menu button:disabled { color: var(--muted); opacity: .6; cursor: default; }
+.ctx-menu kbd { font: inherit; color: var(--muted); }
+.ctx-menu hr { border: none; border-top: 1px solid var(--line); margin: 4px 2px; }
 .modal header { padding: 16px 20px 6px; display: flex; align-items: center; gap: 10px; }
 .modal header h3 { margin: 0; font-size: 17px; flex: 1; }
 .modal .body { padding: 8px 20px 10px; overflow: auto; }
@@ -636,6 +644,53 @@ const ask = (text, o = {}) => uiDialog({ title: o.title || "Подтвержде
   { label: o.cancel || "Отмена", value: false, cancel: true },
   { label: o.ok || "OK", value: true, cls: o.danger ? "danger-fill" : "primary" }] });
 const notice = (text, o = {}) => uiDialog({ title: o.title || "VPNer", text, buttons: [{ label: "OK", value: true, cls: "primary", cancel: true }] });
+
+// The window's own context menu: editing commands in text fields and Copy
+// for selected text — never the browser menu (Back, Print, Inspect…).
+let ctxMenu = null;
+function closeCtx() { if (ctxMenu) { ctxMenu.remove(); ctxMenu = null; } }
+function fieldSelection(el) {
+  try { return el.value.substring(el.selectionStart, el.selectionEnd); } catch (e) { return ""; } // e.g. type=number
+}
+document.addEventListener("contextmenu", e => {
+  e.preventDefault();
+  closeCtx();
+  const el = e.target.closest && e.target.closest("input, textarea, [contenteditable='true']");
+  const textInput = el && (el.tagName !== "INPUT" || ["text", "password", "search", "url", "email", "number", "tel", ""].includes(el.type));
+  let items;
+  if (textInput) {
+    const editable = !el.readOnly && !el.disabled, secret = el.type === "password";
+    const sel = el.isContentEditable ? String(getSelection()) : fieldSelection(el);
+    items = [
+      { label: "Вырезать", kbd: "Ctrl+X", on: editable && !secret && !!sel, run: () => document.execCommand("cut") },
+      { label: "Копировать", kbd: "Ctrl+C", on: !secret && !!sel, run: () => document.execCommand("copy") },
+      { label: "Вставить", kbd: "Ctrl+V", on: editable, run: async () => {
+        const r = await api("GET", "/api/clipboard").catch(err => { toast(err.message, true); return null; });
+        if (r && r.text) { el.focus(); document.execCommand("insertText", false, r.text); }
+      } },
+      null,
+      { label: "Выделить всё", kbd: "Ctrl+A", on: true, run: () => { el.focus(); el.select ? el.select() : document.execCommand("selectAll"); } },
+    ];
+  } else if (String(getSelection()).trim()) {
+    items = [{ label: "Копировать", kbd: "Ctrl+C", on: true, run: () => document.execCommand("copy") }];
+  } else return;
+  const m = document.createElement("div");
+  m.className = "ctx-menu";
+  m.setAttribute("role", "menu");
+  m.innerHTML = items.map((it, i) => it ? `<button role="menuitem" data-i="${i}" ${it.on ? "" : "disabled"}><span>${it.label}</span><kbd>${it.kbd}</kbd></button>` : "<hr>").join("");
+  // keep the focus (and the selection) in the field while clicking the menu
+  m.addEventListener("mousedown", ev => ev.preventDefault());
+  m.querySelectorAll("button").forEach(b => b.onclick = () => { const it = items[+b.dataset.i]; closeCtx(); it.run(); });
+  document.body.appendChild(m);
+  ctxMenu = m;
+  const w = m.offsetWidth, h = m.offsetHeight;
+  m.style.left = Math.max(4, Math.min(e.clientX, innerWidth - w - 4)) + "px";
+  m.style.top = Math.max(4, Math.min(e.clientY, innerHeight - h - 4)) + "px";
+});
+addEventListener("mousedown", e => { if (ctxMenu && !ctxMenu.contains(e.target)) closeCtx(); }, true);
+addEventListener("blur", closeCtx);
+addEventListener("resize", closeCtx);
+document.addEventListener("scroll", closeCtx, true);
 document.addEventListener("keydown", e => { if (e.key === "Escape" && $("#modal-root").innerHTML) closeModal(); });
 
 function addConn() {
@@ -1240,12 +1295,12 @@ async function enableHV() {
   const r = await act(() => api("POST", "/api/hyperv/enable"));
   await notice(r.output === "restart" ? "Hyper-V включён. Перезагрузите компьютер, чтобы закончить установку." : "Готово: " + r.output, { title: "Hyper-V" });
 }
-function exportProfile() {
-  const secrets = $("#ex-secrets") && $("#ex-secrets").checked ? "1" : "0";
-  const a = document.createElement("a");
-  a.href = `/api/export?secrets=${secrets}&token=${encodeURIComponent(TOKEN)}`;
-  a.download = "";
-  document.body.appendChild(a); a.click(); a.remove();
+// Export goes through the standard Windows "Save as" dialog, not a browser
+// download.
+async function exportProfile() {
+  const secrets = !!($("#ex-secrets") && $("#ex-secrets").checked);
+  const r = await act(() => api("POST", "/api/export/save", { secrets }));
+  if (r && r.path) toast("Профиль сохранён: " + r.path);
 }
 async function installWSL() {
   const r = await act(() => api("POST", "/api/wsl/install"));

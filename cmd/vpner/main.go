@@ -180,9 +180,13 @@ func main() {
 			if s.Running {
 				icon, tip = "on", "VPNer — маршрутизация включена"
 				for _, c := range s.Connections {
-					if c.State == "down" || c.State == "failed" || c.State == "auth" || c.State == "confirm" {
+					switch c.State {
+					case "down", "failed":
 						icon, tip = "warn", "VPNer — есть проблемы с подключениями"
-						break
+					case "auth", "confirm", "queued":
+						if icon != "warn" {
+							icon, tip = "warn", "VPNer — подключения ждут подтверждения входа"
+						}
 					}
 				}
 				mToggle.SetTitle("Выключить маршрутизацию")

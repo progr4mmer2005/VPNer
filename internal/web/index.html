@@ -114,6 +114,15 @@ td.mono, .mono { font-family: var(--mono); font-size: 12.5px; word-break: break-
 .rule:hover .r-grip { opacity: 1; }
 .r-grip:hover { background: var(--panel2); color: var(--text); }
 .r-grip:active { cursor: grabbing; }
+.r-grip { touch-action: none; }
+.rule-ghost { position: fixed; z-index: 50; margin: 0; pointer-events: none; opacity: .96; border-color: var(--accent);
+  box-shadow: 0 14px 34px rgba(0,0,0,.38), 0 0 0 1px var(--accent); }
+.rule-ghost .r-grip { opacity: 1; color: var(--text); }
+body.rule-dragging { user-select: none; -webkit-user-select: none; }
+body.rule-dragging, body.rule-dragging * { cursor: grabbing !important; }
+.rule.moved { animation: rule-moved 1.2s ease-out; }
+@keyframes rule-moved { from { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-weak); } to { box-shadow: 0 0 0 0 transparent; } }
+@media (prefers-reduced-motion: reduce) { .rule.moved { animation: none; } }
 .r-arrow { color: var(--muted); height: 32px; display: flex; align-items: center; justify-content: center; }
 .r-target { display: flex; align-items: center; gap: 8px; }
 .r-target .via { display: none; color: var(--muted); font-size: 12.5px; white-space: nowrap; }
@@ -162,6 +171,10 @@ td.mono, .mono { font-family: var(--mono); font-size: 12.5px; word-break: break-
     grid-template-areas: "grip sw kind actions" "vals vals vals vals" "target target target target"; }
   .r-vals, .r-target { padding-left: 8px; }
 }
+@container rules (max-width: 460px) {
+  .rule:not(.dns-rule) { grid-template-areas: "grip sw . actions" "kind kind kind kind" "vals vals vals vals" "target target target target"; }
+  .rule:not(.dns-rule) > .r-kind { margin-left: 8px; width: calc(100% - 8px); }
+}
 input[type=checkbox].switch { appearance: none; -webkit-appearance: none; width: 34px; height: 20px; margin: 0; border-radius: 999px; background: var(--line); position: relative; cursor: pointer; transition: background .15s; flex: none; }
 input[type=checkbox].switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.3); transition: transform .15s; }
 input[type=checkbox].switch:checked { background: var(--accent); }
@@ -181,7 +194,8 @@ label.check input.switch { margin-top: 1px; }
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; margin-bottom: 14px; box-shadow: var(--shadow); }
 .panel h3 { margin: 0 0 10px; font-size: 15px; }
 .final { display: grid; grid-template-columns: 1fr 260px; gap: 12px; align-items: center; }
-.savebar { position: sticky; bottom: 0; background: var(--bg); padding: 12px 0; display: flex; gap: 10px; align-items: center; border-top: 1px solid var(--line); margin-top: 14px; }
+.savebar { position: sticky; bottom: 0; background: var(--bg); padding: 12px 0; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; border-top: 1px solid var(--line); margin-top: 14px; }
+.savebar .help { min-width: 0; }
 .modal-bg { position: fixed; inset: 0; background: rgba(10,14,20,.45); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 20px; }
 .modal { background: var(--panel); border-radius: 14px; width: 640px; max-width: 100%; max-height: calc(100vh - 40px); display: flex; flex-direction: column; box-shadow: 0 10px 40px rgba(0,0,0,.25); }
 .modal.wide { width: 860px; }
@@ -309,7 +323,7 @@ const RUNTIME = { native: ["native", "Встроенный"], wsl: ["wsl", "Ко
 const STATES = {
   ready: ["ok", "Готово"], up: ["ok", "Подключено"], starting: ["warn", "Подключается…"], auth: ["warn", "Нужен ввод"],
   down: ["bad", "Нет связи"], failed: ["bad", "Ошибка"], off: ["muted", "Отключено"], stopped: ["muted", "Отключено"], disabled: ["muted", "Выключено"],
-  provisioning: ["warn", "Создаётся…"], novpn: ["warn", "VPN в ВМ не подключён"], confirm: ["warn", "Ожидает подтверждения"]
+  provisioning: ["warn", "Создаётся…"], novpn: ["warn", "VPN в ВМ не подключён"], confirm: ["warn", "Ожидает подтверждения"], queued: ["warn", "В очереди"]
 };
 // Ready-made rule sets: sites (with subdomains) and desktop apps.
 const RULE_PRESETS = [
@@ -379,6 +393,8 @@ const svg = d => `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" str
 const ICON = {
   up: svg('<path d="M4 10l4-4 4 4"/>'),
   down: svg('<path d="M4 6l4 4 4-4"/>'),
+  top: svg('<path d="M3.5 3h9M4 11l4-4 4 4"/>'),
+  bottom: svg('<path d="M3.5 13h9M4 5l4 4 4-4"/>'),
   close: svg('<path d="M4 4l8 8M12 4l-8 8"/>'),
   trash: svg('<path d="M2.5 4.5h11M6.5 2.5h3M4 4.5l.6 8.1a1 1 0 0 0 1 .9h4.8a1 1 0 0 0 1-.9l.6-8.1M6.7 7v4M9.3 7v4"/>'),
 };
@@ -435,10 +451,11 @@ function renderHeader() {
   const st = S.state; if (!st) return;
   const conns = st.connections || [];
   const active = conns.filter(c => c.state === "up" || c.state === "ready").length;
-  const problems = conns.filter(c => ["down", "failed", "auth", "confirm"].includes(c.state)).length;
+  const problems = conns.filter(c => ["down", "failed"].includes(c.state)).length;
+  const waiting = conns.filter(c => ["auth", "confirm", "queued"].includes(c.state)).length;
   let dot = "dot", title, sub;
   if (st.starting) { dot += " warn"; title = "Запуск…"; sub = st.setup ? st.setup.stage : ""; }
-  else if (st.running) { dot += problems ? " warn" : " ok"; title = "Маршрутизация включена"; sub = `активно: ${active} из ${conns.filter(c=>c.enabled).length}` + (problems ? ` · проблемы: ${problems}` : "") + (st.killSwitch ? " · kill-switch включён" : ""); }
+  else if (st.running) { dot += problems || waiting ? " warn" : " ok"; title = "Маршрутизация включена"; sub = `активно: ${active} из ${conns.filter(c=>c.enabled).length}` + (waiting ? ` · ждут входа: ${waiting}` : "") + (problems ? ` · проблемы: ${problems}` : "") + (st.killSwitch ? " · kill-switch включён" : ""); }
   else { title = "Маршрутизация выключена"; sub = "весь трафик идёт как обычно"; }
   $("#st-dot").className = dot; $("#st-title").textContent = title; $("#st-sub").textContent = sub;
   const pw = $("#power");
@@ -472,7 +489,7 @@ let quitShown = false;
 function showQuitConfirm() {
   if (quitShown) return;
   quitShown = true;
-  const active = ((S.state && S.state.connections) || []).filter(c => ["up", "ready", "starting", "auth", "confirm", "provisioning", "novpn"].includes(c.state));
+  const active = ((S.state && S.state.connections) || []).filter(c => ["up", "ready", "starting", "auth", "confirm", "queued", "provisioning", "novpn"].includes(c.state));
   const list = active.map(c => `<li>${esc(c.name)}</li>`).join("");
   const m = modal(`<header><h3>Выйти из VPNer?</h3></header>
     <div class="body"><p style="margin-top:0">Сейчас работают VPN-подключения${active.length ? ":" : "."}</p>${list ? `<ul style="margin:0 0 12px;padding-left:20px">${list}</ul>` : ""}
@@ -516,7 +533,7 @@ function renderConns() {
       const [rcls, rtitle] = RUNTIME[v.runtime] || ["", v.runtime || ""];
       const [scls, stitle] = STATES[v.state] || ["muted", v.state || ""];
       const isRuntime = v.runtime && v.runtime !== "native";
-      const running = ["up", "starting", "auth", "confirm", "down", "provisioning", "novpn"].includes(v.state);
+      const running = ["up", "starting", "auth", "confirm", "queued", "down", "provisioning", "novpn"].includes(v.state);
       let kv = "";
       if (v.ip) kv += `<span>Адрес в VPN</span><span class="mono">${esc(v.ip)}</span>`;
       if (v.dns && v.dns.length) kv += `<span>DNS туннеля</span><span class="mono">${esc(v.dns.join(", "))}</span>`;
@@ -530,7 +547,7 @@ function renderConns() {
         ${v.state === "starting" && v.since && Date.now() / 1000 - v.since > 8 ? `<div class="detail" style="color:var(--warn)">Подключается дольше обычного — возможно, вход ожидает дополнительного подтверждения.</div>` : ""}
         ${kv ? `<div class="kv">${kv}</div>` : ""}
         <div class="actions">
-          ${isRuntime && c.enabled ? (running ? `<button class="btn small" onclick="connAction('${c.id}','disconnect')">Отключить</button>` : `<button class="btn small primary" onclick="connAction('${c.id}','connect')">Подключить</button>`) : ""}
+          ${isRuntime && c.enabled ? (running ? `<button class="btn small" onclick="connAction('${c.id}','disconnect')">${v.state === "queued" ? "Отменить" : "Отключить"}</button>` : `<button class="btn small primary" onclick="connAction('${c.id}','connect')">Подключить</button>`) : ""}
           ${v.runtime === "vm" ? `<button class="btn small" onclick="connAction('${c.id}','console')">Окно ВМ</button>` : ""}
           ${v.runtime === "vm" && running ? `<label class="btn small" title="Установщик VPN-программы, конфиг, сертификат — появится в папке «Файлы из VPNer» на рабочем столе ВМ">Передать файл<input type="file" hidden onchange="vmUpload('${c.id}', this)"></label>` : ""}
           ${v.prompt ? `<button class="btn small primary" onclick="showPrompt(connView('${c.id}'), true)">Ввести</button>` : ""}
@@ -740,8 +757,10 @@ function renderRules() {
       <div class="r-arrow" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 14 14"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
       <div class="r-target"><span class="via">через</span><select aria-label="Куда направлять" onchange="ruleSet(${i},'target',this.value)">${targetOptions(r.target)}</select></div>
       <div class="r-actions">
+        <button class="icon-btn" title="В самый верх" aria-label="В самый верх" ${i === 0 ? "disabled" : ""} onclick="moveRuleTo(${i},0)">${ICON.top}</button>
         <button class="icon-btn" title="Поднять выше" aria-label="Поднять выше" ${i === 0 ? "disabled" : ""} onclick="moveRule(${i},-1)">${ICON.up}</button>
         <button class="icon-btn" title="Опустить ниже" aria-label="Опустить ниже" ${i === R.length - 1 ? "disabled" : ""} onclick="moveRule(${i},1)">${ICON.down}</button>
+        <button class="icon-btn" title="В самый низ" aria-label="В самый низ" ${i === R.length - 1 ? "disabled" : ""} onclick="moveRuleTo(${i},${R.length - 1})">${ICON.bottom}</button>
         <span class="sep"></span>
         <button class="icon-btn danger" title="Удалить правило" aria-label="Удалить правило" onclick="delRule(${i})">${ICON.trash}</button>
       </div>
@@ -756,33 +775,99 @@ function renderRules() {
   wireRuleDrag();
   updSave();
 }
+// Rule reordering with pointer events (not HTML5 drag and drop): the mouse
+// wheel keeps scrolling while a rule is held, and the list scrolls by itself
+// when the rule is pulled to the top or bottom edge.
+let RD = null;
 function wireRuleDrag() {
-  let from = null;
-  $$(".rule").forEach(row => {
-    const grip = $(".r-grip", row);
-    grip.onmousedown = () => { row.draggable = true; };
-    row.onmouseup = row.ondragend = () => { row.draggable = false; row.classList.remove("dragging"); $$(".rule").forEach(x => x.classList.remove("drop-before", "drop-after")); };
-    row.ondragstart = e => { from = +row.dataset.i; row.classList.add("dragging"); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(from)); };
-    row.ondragover = e => {
-      if (from === null) return;
+  $$(".rules > .rule .r-grip").forEach(grip => {
+    grip.onpointerdown = e => {
+      if (e.button !== 0 || RD) return;
       e.preventDefault();
-      const r = row.getBoundingClientRect(), after = e.clientY > r.top + r.height / 2;
-      $$(".rule").forEach(x => x.classList.remove("drop-before", "drop-after"));
-      if (+row.dataset.i !== from) row.classList.add(after ? "drop-after" : "drop-before");
-    };
-    row.ondrop = e => {
-      e.preventDefault();
-      if (from === null) return;
-      const r = row.getBoundingClientRect(), after = e.clientY > r.top + r.height / 2;
-      let to = +row.dataset.i + (after ? 1 : 0);
-      const R = S.rulesDraft, [item] = R.splice(from, 1);
-      if (to > from) to--;
-      R.splice(to, 0, item);
-      from = null;
-      if (to !== +e.dataTransfer.getData("text/plain")) S.rulesDirty = true;
-      renderRules();
+      startRuleDrag(grip, e);
     };
   });
+}
+const ruleRows = () => $$(".rules > .rule:not(.rule-ghost)");
+function startRuleDrag(grip, e) {
+  const row = grip.closest(".rule"), list = row.parentElement, rect = row.getBoundingClientRect();
+  const ghost = row.cloneNode(true);
+  ghost.classList.add("rule-ghost");
+  ghost.removeAttribute("data-i");
+  ghost.style.width = rect.width + "px";
+  // inside the list, so the list's container queries still shape it
+  list.appendChild(ghost);
+  row.classList.add("dragging");
+  document.body.classList.add("rule-dragging");
+  RD = { grip, row, ghost, from: +row.dataset.i, to: +row.dataset.i, dy: e.clientY - rect.top, x: rect.left, y: e.clientY,
+    scroller: $("main"), raf: 0, last: 0 };
+  try { grip.setPointerCapture(e.pointerId); } catch (err) {}
+  grip.onpointermove = ev => { RD.y = ev.clientY; placeGhost(); findDrop(); };
+  grip.onpointerup = () => endRuleDrag(true);
+  grip.onpointercancel = () => endRuleDrag(false);
+  RD.scroller.addEventListener("scroll", onDragScroll);
+  addEventListener("keydown", onDragKey, true);
+  placeGhost(); findDrop();
+  RD.raf = requestAnimationFrame(dragAutoScroll);
+}
+function placeGhost() {
+  RD.ghost.style.left = RD.x + "px";
+  RD.ghost.style.top = (RD.y - RD.dy) + "px";
+}
+function findDrop() {
+  const rows = ruleRows();
+  let at = rows.length; // insert before the rule with this index
+  for (const r of rows) {
+    const b = r.getBoundingClientRect();
+    if (RD.y < b.top + b.height / 2) { at = +r.dataset.i; break; }
+  }
+  rows.forEach(x => x.classList.remove("drop-before", "drop-after"));
+  if (at === RD.from || at === RD.from + 1) { RD.to = RD.from; return; }
+  if (at < rows.length) rows[at].classList.add("drop-before");
+  else rows[rows.length - 1].classList.add("drop-after");
+  RD.to = at > RD.from ? at - 1 : at;
+}
+function onDragScroll() { if (RD) { placeGhost(); findDrop(); } }
+function onDragKey(e) { if (RD && e.key === "Escape") { e.preventDefault(); e.stopPropagation(); endRuleDrag(false); } }
+function dragAutoScroll(t) {
+  if (!RD) return;
+  const dt = RD.last ? Math.min(50, t - RD.last) : 16;
+  RD.last = t;
+  const r = RD.scroller.getBoundingClientRect(), edge = Math.min(80, r.height / 4);
+  let k = 0;
+  if (RD.y < r.top + edge) k = -Math.min(1, (r.top + edge - RD.y) / edge);
+  else if (RD.y > r.bottom - edge) k = Math.min(1, (RD.y - (r.bottom - edge)) / edge);
+  if (k) RD.scroller.scrollTop += k * k * Math.sign(k) * 1.4 * dt; // up to ~1400 px/s, gentle near the edge start
+  RD.raf = requestAnimationFrame(dragAutoScroll);
+}
+function endRuleDrag(commit) {
+  const d = RD;
+  if (!d) return;
+  RD = null;
+  cancelAnimationFrame(d.raf);
+  d.scroller.removeEventListener("scroll", onDragScroll);
+  removeEventListener("keydown", onDragKey, true);
+  d.grip.onpointermove = d.grip.onpointerup = d.grip.onpointercancel = null;
+  d.ghost.remove();
+  d.row.classList.remove("dragging");
+  document.body.classList.remove("rule-dragging");
+  ruleRows().forEach(x => x.classList.remove("drop-before", "drop-after"));
+  if (commit && d.to !== d.from) moveRuleTo(d.from, d.to, false);
+}
+// moveRuleTo moves rule i to position to; scroll brings it into view (for
+// the top/bottom buttons, whose target may be far away).
+function moveRuleTo(i, to, scroll = true) {
+  const R = S.rulesDraft;
+  to = Math.max(0, Math.min(R.length - 1, to));
+  if (to === i) return;
+  R.splice(to, 0, R.splice(i, 1)[0]);
+  S.rulesDirty = true;
+  renderRules();
+  const row = ruleRows()[to];
+  if (!row) return;
+  if (scroll) row.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  row.classList.add("moved");
+  setTimeout(() => row.classList.remove("moved"), 1200);
 }
 function updSave() {
   const d = S.rulesDirty;

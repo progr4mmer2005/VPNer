@@ -114,6 +114,15 @@ td.mono, .mono { font-family: var(--mono); font-size: 12.5px; word-break: break-
 .rule:hover .r-grip { opacity: 1; }
 .r-grip:hover { background: var(--panel2); color: var(--text); }
 .r-grip:active { cursor: grabbing; }
+.r-grip { touch-action: none; }
+.rule-ghost { position: fixed; z-index: 50; margin: 0; pointer-events: none; opacity: .96; border-color: var(--accent);
+  box-shadow: 0 14px 34px rgba(0,0,0,.38), 0 0 0 1px var(--accent); }
+.rule-ghost .r-grip { opacity: 1; color: var(--text); }
+body.rule-dragging { user-select: none; -webkit-user-select: none; }
+body.rule-dragging, body.rule-dragging * { cursor: grabbing !important; }
+.rule.moved { animation: rule-moved 1.2s ease-out; }
+@keyframes rule-moved { from { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-weak); } to { box-shadow: 0 0 0 0 transparent; } }
+@media (prefers-reduced-motion: reduce) { .rule.moved { animation: none; } }
 .r-arrow { color: var(--muted); height: 32px; display: flex; align-items: center; justify-content: center; }
 .r-target { display: flex; align-items: center; gap: 8px; }
 .r-target .via { display: none; color: var(--muted); font-size: 12.5px; white-space: nowrap; }
@@ -757,33 +766,99 @@ function renderRules() {
   wireRuleDrag();
   updSave();
 }
+// Rule reordering with pointer events (not HTML5 drag and drop): the mouse
+// wheel keeps scrolling while a rule is held, and the list scrolls by itself
+// when the rule is pulled to the top or bottom edge.
+let RD = null;
 function wireRuleDrag() {
-  let from = null;
-  $$(".rule").forEach(row => {
-    const grip = $(".r-grip", row);
-    grip.onmousedown = () => { row.draggable = true; };
-    row.onmouseup = row.ondragend = () => { row.draggable = false; row.classList.remove("dragging"); $$(".rule").forEach(x => x.classList.remove("drop-before", "drop-after")); };
-    row.ondragstart = e => { from = +row.dataset.i; row.classList.add("dragging"); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(from)); };
-    row.ondragover = e => {
-      if (from === null) return;
+  $$(".rules > .rule .r-grip").forEach(grip => {
+    grip.onpointerdown = e => {
+      if (e.button !== 0 || RD) return;
       e.preventDefault();
-      const r = row.getBoundingClientRect(), after = e.clientY > r.top + r.height / 2;
-      $$(".rule").forEach(x => x.classList.remove("drop-before", "drop-after"));
-      if (+row.dataset.i !== from) row.classList.add(after ? "drop-after" : "drop-before");
-    };
-    row.ondrop = e => {
-      e.preventDefault();
-      if (from === null) return;
-      const r = row.getBoundingClientRect(), after = e.clientY > r.top + r.height / 2;
-      let to = +row.dataset.i + (after ? 1 : 0);
-      const R = S.rulesDraft, [item] = R.splice(from, 1);
-      if (to > from) to--;
-      R.splice(to, 0, item);
-      from = null;
-      if (to !== +e.dataTransfer.getData("text/plain")) S.rulesDirty = true;
-      renderRules();
+      startRuleDrag(grip, e);
     };
   });
+}
+const ruleRows = () => $$(".rules > .rule:not(.rule-ghost)");
+function startRuleDrag(grip, e) {
+  const row = grip.closest(".rule"), list = row.parentElement, rect = row.getBoundingClientRect();
+  const ghost = row.cloneNode(true);
+  ghost.classList.add("rule-ghost");
+  ghost.removeAttribute("data-i");
+  ghost.style.width = rect.width + "px";
+  // inside the list, so the list's container queries still shape it
+  list.appendChild(ghost);
+  row.classList.add("dragging");
+  document.body.classList.add("rule-dragging");
+  RD = { grip, row, ghost, from: +row.dataset.i, to: +row.dataset.i, dy: e.clientY - rect.top, x: rect.left, y: e.clientY,
+    scroller: $("main"), raf: 0, last: 0 };
+  try { grip.setPointerCapture(e.pointerId); } catch (err) {}
+  grip.onpointermove = ev => { RD.y = ev.clientY; placeGhost(); findDrop(); };
+  grip.onpointerup = () => endRuleDrag(true);
+  grip.onpointercancel = () => endRuleDrag(false);
+  RD.scroller.addEventListener("scroll", onDragScroll);
+  addEventListener("keydown", onDragKey, true);
+  placeGhost(); findDrop();
+  RD.raf = requestAnimationFrame(dragAutoScroll);
+}
+function placeGhost() {
+  RD.ghost.style.left = RD.x + "px";
+  RD.ghost.style.top = (RD.y - RD.dy) + "px";
+}
+function findDrop() {
+  const rows = ruleRows();
+  let at = rows.length; // insert before the rule with this index
+  for (const r of rows) {
+    const b = r.getBoundingClientRect();
+    if (RD.y < b.top + b.height / 2) { at = +r.dataset.i; break; }
+  }
+  rows.forEach(x => x.classList.remove("drop-before", "drop-after"));
+  if (at === RD.from || at === RD.from + 1) { RD.to = RD.from; return; }
+  if (at < rows.length) rows[at].classList.add("drop-before");
+  else rows[rows.length - 1].classList.add("drop-after");
+  RD.to = at > RD.from ? at - 1 : at;
+}
+function onDragScroll() { if (RD) { placeGhost(); findDrop(); } }
+function onDragKey(e) { if (RD && e.key === "Escape") { e.preventDefault(); e.stopPropagation(); endRuleDrag(false); } }
+function dragAutoScroll(t) {
+  if (!RD) return;
+  const dt = RD.last ? Math.min(50, t - RD.last) : 16;
+  RD.last = t;
+  const r = RD.scroller.getBoundingClientRect(), edge = Math.min(80, r.height / 4);
+  let k = 0;
+  if (RD.y < r.top + edge) k = -Math.min(1, (r.top + edge - RD.y) / edge);
+  else if (RD.y > r.bottom - edge) k = Math.min(1, (RD.y - (r.bottom - edge)) / edge);
+  if (k) RD.scroller.scrollTop += k * k * Math.sign(k) * 1.4 * dt; // up to ~1400 px/s, gentle near the edge start
+  RD.raf = requestAnimationFrame(dragAutoScroll);
+}
+function endRuleDrag(commit) {
+  const d = RD;
+  if (!d) return;
+  RD = null;
+  cancelAnimationFrame(d.raf);
+  d.scroller.removeEventListener("scroll", onDragScroll);
+  removeEventListener("keydown", onDragKey, true);
+  d.grip.onpointermove = d.grip.onpointerup = d.grip.onpointercancel = null;
+  d.ghost.remove();
+  d.row.classList.remove("dragging");
+  document.body.classList.remove("rule-dragging");
+  ruleRows().forEach(x => x.classList.remove("drop-before", "drop-after"));
+  if (commit && d.to !== d.from) moveRuleTo(d.from, d.to, false);
+}
+// moveRuleTo moves rule i to position to; scroll brings it into view (for
+// the top/bottom buttons, whose target may be far away).
+function moveRuleTo(i, to, scroll = true) {
+  const R = S.rulesDraft;
+  to = Math.max(0, Math.min(R.length - 1, to));
+  if (to === i) return;
+  R.splice(to, 0, R.splice(i, 1)[0]);
+  S.rulesDirty = true;
+  renderRules();
+  const row = ruleRows()[to];
+  if (!row) return;
+  if (scroll) row.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  row.classList.add("moved");
+  setTimeout(() => row.classList.remove("moved"), 1200);
 }
 function updSave() {
   const d = S.rulesDirty;

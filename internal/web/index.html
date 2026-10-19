@@ -388,6 +388,8 @@ const svg = d => `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" str
 const ICON = {
   up: svg('<path d="M4 10l4-4 4 4"/>'),
   down: svg('<path d="M4 6l4 4 4-4"/>'),
+  top: svg('<path d="M3.5 3h9M4 11l4-4 4 4"/>'),
+  bottom: svg('<path d="M3.5 13h9M4 5l4 4 4-4"/>'),
   close: svg('<path d="M4 4l8 8M12 4l-8 8"/>'),
   trash: svg('<path d="M2.5 4.5h11M6.5 2.5h3M4 4.5l.6 8.1a1 1 0 0 0 1 .9h4.8a1 1 0 0 0 1-.9l.6-8.1M6.7 7v4M9.3 7v4"/>'),
 };
@@ -750,8 +752,10 @@ function renderRules() {
       <div class="r-arrow" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 14 14"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
       <div class="r-target"><span class="via">через</span><select aria-label="Куда направлять" onchange="ruleSet(${i},'target',this.value)">${targetOptions(r.target)}</select></div>
       <div class="r-actions">
+        <button class="icon-btn" title="В самый верх" aria-label="В самый верх" ${i === 0 ? "disabled" : ""} onclick="moveRuleTo(${i},0)">${ICON.top}</button>
         <button class="icon-btn" title="Поднять выше" aria-label="Поднять выше" ${i === 0 ? "disabled" : ""} onclick="moveRule(${i},-1)">${ICON.up}</button>
         <button class="icon-btn" title="Опустить ниже" aria-label="Опустить ниже" ${i === R.length - 1 ? "disabled" : ""} onclick="moveRule(${i},1)">${ICON.down}</button>
+        <button class="icon-btn" title="В самый низ" aria-label="В самый низ" ${i === R.length - 1 ? "disabled" : ""} onclick="moveRuleTo(${i},${R.length - 1})">${ICON.bottom}</button>
         <span class="sep"></span>
         <button class="icon-btn danger" title="Удалить правило" aria-label="Удалить правило" onclick="delRule(${i})">${ICON.trash}</button>
       </div>

@@ -35,7 +35,9 @@ if (Get-Command node -ErrorAction SilentlyContinue) {
     $check = @'
 const fs = require('fs');
 const s = fs.readFileSync('internal/web/index.html', 'utf8');
-try { new Function(s.slice(s.indexOf('<script>') + 8, s.lastIndexOf('</script>'))); }
+const re = /<script>([\s\S]*?)<\/script>/g;
+let m;
+try { while ((m = re.exec(s))) new Function(m[1]); }
 catch (e) { console.error('UI script error: ' + e.message); process.exit(1); }
 '@
     node -e $check

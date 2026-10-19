@@ -57,6 +57,8 @@ h2 { font-size: 20px; margin: 0 0 4px; font-weight: 650; }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 .btn.primary:hover { filter: brightness(1.07); }
 .btn.danger { color: var(--bad); }
+.btn.danger-fill { background: var(--bad); border-color: var(--bad); color: #fff; }
+.btn.danger-fill:hover { filter: brightness(1.07); }
 .btn.big { padding: 9px 18px; font-weight: 600; }
 .btn.small { padding: 4px 10px; font-size: 13px; }
 .btn.ghost { border-color: transparent; background: transparent; }
@@ -199,6 +201,13 @@ label.check input.switch { margin-top: 1px; }
 .modal-bg { position: fixed; inset: 0; background: rgba(10,14,20,.45); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 20px; }
 .modal { background: var(--panel); border-radius: 14px; width: 640px; max-width: 100%; max-height: calc(100vh - 40px); display: flex; flex-direction: column; box-shadow: 0 10px 40px rgba(0,0,0,.25); }
 .modal.wide { width: 860px; }
+/* in-app dialogs (instead of the browser's alert/confirm), above modals */
+.dialog-bg { position: fixed; inset: 0; background: rgba(10,14,20,.45); display: flex; align-items: center; justify-content: center; z-index: 80; padding: 20px; animation: fade-in .12s ease-out; }
+.modal.dialog { width: 440px; animation: pop-in .14s ease-out; }
+.dialog-text { margin: 0; white-space: pre-line; line-height: 1.5; }
+@keyframes fade-in { from { opacity: 0; } }
+@keyframes pop-in { from { opacity: 0; transform: scale(.97); } }
+@media (prefers-reduced-motion: reduce) { .dialog-bg, .modal.dialog { animation: none; } }
 .modal header { padding: 16px 20px 6px; display: flex; align-items: center; gap: 10px; }
 .modal header h3 { margin: 0; font-size: 17px; flex: 1; }
 .modal .body { padding: 8px 20px 10px; overflow: auto; }
@@ -503,10 +512,10 @@ async function restoreNet() { await act(() => api("POST", "/api/restore"), "Се
 
 // ---------- tabs ----------
 $$("nav a[data-tab]").forEach(a => a.onclick = () => { setTab(a.dataset.tab); setNav(false); });
-function setTab(t) {
-  if (S.tab === "rules" && t !== "rules" && S.rulesDirty && !confirm("Правила не сохранены. Уйти без сохранения?")) return;
+async function setTab(t) {
+  if (S.tab === "rules" && t !== "rules" && S.rulesDirty && !await ask("Правила не сохранены. Уйти без сохранения?", { title: "Несохранённые правила", ok: "Уйти без сохранения", cancel: "Остаться", danger: true })) return;
   if (S.tab === "rules" && t !== "rules" && S.rulesDirty) { S.rulesDirty = false; S.rulesDraft = structuredClone(S.cfg.rules || []); }
-  if (S.tab === "dns" && t !== "dns" && S.dnsDirty && !confirm("Настройки DNS не сохранены. Уйти без сохранения?")) return;
+  if (S.tab === "dns" && t !== "dns" && S.dnsDirty && !await ask("Настройки DNS не сохранены. Уйти без сохранения?", { title: "Несохранённые настройки DNS", ok: "Уйти без сохранения", cancel: "Остаться", danger: true })) return;
   if (S.tab === "dns" && t !== "dns") { S.dnsDirty = false; S.dnsDraft = null; }
   S.tab = t;
   $$("nav a[data-tab]").forEach(a => a.classList.toggle("active", a.dataset.tab === t));
@@ -579,7 +588,7 @@ async function delConn(id) {
   const c = S.cfg.connections.find(x => x.id === id);
   const used = (S.cfg.rules || []).filter(r => r.target === id).length;
   const isVM = (connView(id).runtime === "vm");
-  if (!confirm(`Удалить «${c.name}»?` + (isVM ? "\n\nВиртуальная машина и всё, что в неё установлено, будут удалены." : "") + (used ? `\n\nПравил, которые ведут в него: ${used}. Они начнут блокировать трафик — так ничего не уйдёт мимо VPN.` : ""))) return;
+  if (!await ask((isVM ? "Виртуальная машина и всё, что в неё установлено, будут удалены." : "Подключение будет удалено.") + (used ? `\n\nПравил, которые ведут в него: ${used}. Они начнут блокировать трафик — так ничего не уйдёт мимо VPN.` : ""), { title: `Удалить «${c.name}»?`, ok: "Удалить", danger: true })) return;
   await act(() => api("DELETE", "/api/connections/" + id), "Удалено"); await loadConfig(); render();
 }
 
@@ -592,6 +601,41 @@ function modal(html, opts = {}) {
   return $(".modal", root);
 }
 function closeModal() { $("#modal-root").innerHTML = ""; promptOpen = null; }
+
+// ---------- app window behaviour ----------
+// In-app dialogs instead of the browser's alert/confirm. They stack above
+// an open modal and resolve with the value of the pressed button.
+function uiDialog({ title, text, buttons }) {
+  return new Promise(resolve => {
+    const bg = document.createElement("div");
+    bg.className = "dialog-bg";
+    bg.innerHTML = `<div class="modal dialog" role="alertdialog" aria-modal="true" aria-labelledby="dlg-t">
+      <header><h3 id="dlg-t">${esc(title)}</h3></header>
+      <div class="body"><p class="dialog-text">${esc(text)}</p></div>
+      <footer>${buttons.map((b, i) => `<button class="btn ${b.cls || ""}" data-i="${i}">${esc(b.label)}</button>`).join("")}</footer></div>`;
+    const prev = document.activeElement;
+    const btns = [...bg.querySelectorAll("footer button")];
+    const cancel = buttons.find(b => b.cancel);
+    const done = v => { removeEventListener("keydown", key, true); bg.remove(); if (prev && prev.focus) prev.focus(); resolve(v); };
+    const key = e => {
+      e.stopPropagation();
+      if (e.key === "Escape") { e.preventDefault(); done(cancel ? cancel.value : undefined); }
+      else if (e.key === "Tab") { // keep focus inside the dialog
+        e.preventDefault();
+        const k = btns.indexOf(document.activeElement);
+        btns[(k + (e.shiftKey ? btns.length - 1 : 1)) % btns.length].focus();
+      }
+    };
+    btns.forEach(b => b.onclick = () => done(buttons[+b.dataset.i].value));
+    addEventListener("keydown", key, true);
+    document.body.appendChild(bg);
+    (bg.querySelector(".btn.primary, .btn.danger-fill") || btns[0]).focus();
+  });
+}
+const ask = (text, o = {}) => uiDialog({ title: o.title || "Подтверждение", text, buttons: [
+  { label: o.cancel || "Отмена", value: false, cancel: true },
+  { label: o.ok || "OK", value: true, cls: o.danger ? "danger-fill" : "primary" }] });
+const notice = (text, o = {}) => uiDialog({ title: o.title || "VPNer", text, buttons: [{ label: "OK", value: true, cls: "primary", cancel: true }] });
 document.addEventListener("keydown", e => { if (e.key === "Escape" && $("#modal-root").innerHTML) closeModal(); });
 
 function addConn() {
@@ -653,7 +697,7 @@ function showImportSummary(src, prev) {
   $("#io-go", m).onclick = async () => {
     const opt = { rules: !!($("#io-rules", m) && $("#io-rules", m).checked), replaceRules: !!($("#io-replace", m) && $("#io-replace", m).checked),
       final: !!($("#io-final", m) && $("#io-final", m).checked), settings: !!($("#io-settings", m) && $("#io-settings", m).checked) };
-    if (opt.replaceRules && !confirm("Текущие правила будут заменены. Продолжить?")) return;
+    if (opt.replaceRules && !await ask("Текущие правила будут заменены правилами из профиля.", { title: "Заменить правила?", ok: "Заменить", danger: true })) return;
     const r = await act(() => api("POST", "/api/import", { ...src, ...opt }));
     S.rulesDirty = false; await loadConfig(); closeModal(); render();
     toast(`Добавлено подключений: ${(r.ids || []).length}` + (opt.rules ? `, правил: ${prev.rules}` : ""));
@@ -1020,10 +1064,10 @@ function dnsAddServer(name, addr) {
   if (!name) { const n = $$(".d-name"); n[n.length - 1].focus(); }
 }
 function dnsAddPreset(sel) { const p = DNS_PRESETS[+sel.value]; sel.value = ""; if (p) dnsAddServer(p[0], p[1]); }
-function dnsDelServer(i) {
+async function dnsDelServer(i) {
   const D = S.dnsDraft, sv = D.servers[i];
   const used = D.rules.filter(r => r.server === sv.id).length;
-  if (used && !confirm(`Сервер используется в правилах DNS (${used}). Удалить вместе с ними?`)) return;
+  if (used && !await ask(`Сервер используется в правилах DNS: ${used}. Они будут удалены вместе с ним.`, { title: `Удалить «${sv.name || sv.address}»?`, ok: "Удалить", danger: true })) return;
   D.rules = D.rules.filter(r => r.server !== sv.id); D.default = D.default.filter(x => x !== sv.id);
   D.servers.splice(i, 1); S.dnsDirty = true; renderDNS();
 }
@@ -1194,7 +1238,7 @@ async function loadHV() {
 }
 async function enableHV() {
   const r = await act(() => api("POST", "/api/hyperv/enable"));
-  alert(r.output === "restart" ? "Hyper-V включён. Перезагрузите компьютер." : "Готово: " + r.output);
+  await notice(r.output === "restart" ? "Hyper-V включён. Перезагрузите компьютер, чтобы закончить установку." : "Готово: " + r.output, { title: "Hyper-V" });
 }
 function exportProfile() {
   const secrets = $("#ex-secrets") && $("#ex-secrets").checked ? "1" : "0";
@@ -1205,7 +1249,7 @@ function exportProfile() {
 }
 async function installWSL() {
   const r = await act(() => api("POST", "/api/wsl/install"));
-  alert("WSL устанавливается. После завершения перезагрузите компьютер.\n\n" + (r.output || ""));
+  await notice("WSL устанавливается. После завершения перезагрузите компьютер." + (r.output ? "\n\n" + r.output : ""), { title: "WSL" });
 }
 
 // keep durations and hints on connection cards fresh

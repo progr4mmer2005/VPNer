@@ -5,6 +5,7 @@ package app
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -387,6 +388,28 @@ func (a *App) DNSQuery(name, qtype string) (any, error) {
 		return nil, errors.New("включите маршрутизацию, чтобы проверить DNS")
 	}
 	return m.DNSQuery(name, qtype)
+}
+
+// SaveAppearance stores the interface look. It changes nothing in routing,
+// so the engine is not touched.
+func (a *App) SaveAppearance(raw json.RawMessage) error {
+	if len(raw) > 256<<10 {
+		return errors.New("настройки оформления слишком большие")
+	}
+	if !json.Valid(raw) {
+		return errors.New("настройки оформления повреждены")
+	}
+	a.ops.Lock()
+	defer a.ops.Unlock()
+	cfg := a.Config()
+	cfg.Appearance = append(json.RawMessage(nil), raw...)
+	if err := a.store.Save(cfg); err != nil {
+		return err
+	}
+	a.mu.Lock()
+	a.cfg = cfg
+	a.mu.Unlock()
+	return nil
 }
 
 func (a *App) SaveSettings(s config.Settings) error {

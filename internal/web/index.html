@@ -428,6 +428,44 @@ input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px va
   :root[data-theme="cli"] select optgroup::label::before { content: "## "; }
 }
 
+/* ---------- setup wizard (setup mode of the same page) ---------- */
+body.setup .app { grid-template-columns: 1fr; }
+body.setup nav, body.setup header.top, body.setup .scrim, body.setup #banners { display: none; }
+body.setup main { justify-content: center; }
+body.setup .content { max-width: 820px; margin: 0 auto; padding: 28px 32px; }
+.wiz { display: flex; flex-direction: column; gap: 18px; min-height: calc(100vh - 56px); }
+.wiz-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.wiz-top .brand { padding: 0; font-size: 19px; }
+.wiz-top .brand .badge { font-weight: 500; }
+.wiz-steps { display: flex; gap: 14px; list-style: none; margin: 0; padding: 0; color: var(--muted); font-size: 13px; flex-wrap: wrap; }
+.wiz-steps li { display: flex; align-items: center; gap: 6px; }
+.wiz-steps li span { width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; border: 1.5px solid var(--line); font-size: 12px; font-weight: 600; }
+.wiz-steps li.on { color: var(--text); font-weight: 600; }
+.wiz-steps li.on span { border-color: var(--accent); color: var(--accent); }
+.wiz-steps li.done span { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.wiz-body { flex: 1; }
+.wiz-body h2 { font-size: 26px; margin-bottom: 8px; }
+.wiz-list { margin: 8px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+.wiz-row { display: flex; align-items: center; gap: 14px; margin-top: 16px; flex-wrap: wrap; }
+.wiz-label { width: 90px; font-weight: 600; font-size: 13px; }
+.wiz-accents { display: flex; gap: 8px; flex-wrap: wrap; }
+.wiz-accents button { width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--panel); box-shadow: 0 0 0 1px var(--line); background: var(--sw); cursor: pointer; color: var(--on-accent); font-weight: 700; font-size: 12px; padding: 0; }
+.wiz-accents button.on { box-shadow: 0 0 0 2px var(--text); }
+.wiz-opt { margin-top: 12px; }
+.inst-log { margin-top: 12px; font-family: var(--mono); font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
+.inst-log div { display: flex; gap: 8px; color: var(--text); }
+.inst-log div span { width: 14px; color: var(--accent); }
+.inst-log div.ok { color: var(--muted); } .inst-log div.ok span { color: var(--ok); }
+.wiz-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding-top: 14px; border-top: 1px solid var(--line); }
+:root[data-theme="cli"] .wiz-steps li span { border-radius: 0; border: none; width: auto; }
+:root[data-theme="cli"] .wiz-steps li span::before { content: "["; } :root[data-theme="cli"] .wiz-steps li span::after { content: "]"; }
+:root[data-theme="cli"] .wiz-steps li.done span { background: none; color: var(--ok); }
+:root[data-theme="cli"] .wiz-accents button { border-radius: 0; }
+:root[data-theme="cli"] .wiz-foot { border-top: none; background: var(--cli-hline) left top / 8px 14px repeat-x; padding-top: 18px; }
+:root[data-theme="glass"] body.setup .content { background: var(--glass); backdrop-filter: blur(28px) saturate(1.6); border: 1px solid var(--glass-line); border-radius: var(--r-modal); margin: 24px auto; box-shadow: var(--shadow); }
+:root[data-theme="glass"] .wiz { min-height: calc(100vh - 106px); }
+@media (max-width: 560px) { body.setup .content { padding: 20px 16px; } .wiz-label { width: 100%; } }
+
 /* ---------- effects layers ---------- */
 #fx-rain, #fx-scan, #fx-flicker, #fx-beam, #fx-noise { position: fixed; inset: 0; pointer-events: none; display: none; }
 #fx-rain { z-index: 0; width: 100%; height: 100%; opacity: .55; }
@@ -792,6 +830,7 @@ async function loadConfig() {
   if (!apReady) { apReady = true; apLoad(); } else apApply();
 }
 async function boot() {
+  if (window.VPNER_SETUP) return setupBoot();
   try {
     [S.providers, S.info] = await Promise.all([api("GET", "/api/providers"), api("GET", "/api/info")]);
     await loadConfig();
@@ -1283,6 +1322,114 @@ function openColorPicker(anchor, value, onInput) {
   addEventListener("mousedown", CP.out, true);
   $("main").addEventListener("scroll", closeColorPicker, { once: true });
   draw(false);
+}
+
+// ---------- setup wizard (vpner-setup.exe serves this page in setup mode) ----------
+const SETUP = { step: "welcome", info: null, opts: null, status: null, poll: null };
+const SETUP_STEPS = [["theme", "Оформление"], ["options", "Параметры"], ["install", "Установка"]];
+const SETUP_ACCENTS = [null, "#2f6fed", "#0067c0", "#7c3aed", "#db2777", "#e8875a", "#16a34a", "#0d9488", "#ca8a04"];
+async function setupBoot() {
+  document.body.classList.add("setup");
+  document.title = "Установка VPNer";
+  try {
+    SETUP.info = await api("GET", "/api/setup");
+    await loadConfig();
+  } catch (e) {
+    document.body.innerHTML = '<div style="padding:40px;font:16px Segoe UI">Установщик не отвечает.<br><small>' + esc(e.message) + '</small></div>';
+    return;
+  }
+  SETUP.opts = { ...SETUP.info.opts };
+  setInterval(() => api("POST", "/api/setup/ping").catch(() => {}), 3000);
+  decWatch();
+  setupGo("welcome");
+}
+function setupGo(step) {
+  SETUP.step = step;
+  S.tab = "setup:" + step; // a new "tab" for the screen decryption and the typed heading
+  renderSetup();
+  fxTypeHeading();
+}
+function setupHead() {
+  const i = SETUP_STEPS.findIndex(s => s[0] === SETUP.step || (SETUP.step === "done" && s[0] === "install"));
+  return `<div class="wiz-top"><div class="brand"><svg viewBox="0 0 32 32"><rect width="32" height="32" rx="8"/><path d="M9 10l7 13 7-13" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>VPNer <span class="badge">${esc(SETUP.info.version)}</span></div>
+    ${SETUP.step === "welcome" ? "" : `<ol class="wiz-steps">${SETUP_STEPS.map(([id, t], k) => `<li class="${k < i || SETUP.step === "done" ? "done" : k === i ? "on" : ""}"><span>${k + 1}</span>${t}</li>`).join("")}</ol>`}</div>`;
+}
+function renderSetup() {
+  const v = $("#view"), st = SETUP.step, o = SETUP.opts, eff = apEffectiveMode(), t = apTheme();
+  let body = "", foot = "";
+  if (st === "welcome") {
+    body = `<h2>Установка VPNer</h2>
+      <p class="lead">Несколько VPN одновременно, без конфликтов и утечек: каждая программа и каждый сайт идут через своё подключение.</p>
+      <ul class="wiz-list"><li>Cisco, OpenVPN, AmneziaWG, WireGuard, VLESS и другие — каждый в своём изолированном контейнере</li>
+        <li>Правила для программ, сайтов и IP, свой DNS для доменов</li><li>Kill-switch: при сбое трафик блокируется, а не уходит напрямую</li></ul>
+      ${SETUP.info.installed ? `<div class="banner info" style="margin:16px 0 0">Уже установлена версия ${esc(SETUP.info.installed)} — она будет обновлена, настройки и подключения сохранятся.</div>` : ""}`;
+    foot = `<span></span><button class="btn primary big" data-go="theme">Начать</button>`;
+  } else if (st === "theme") {
+    const prev = th => { const mode = th.modes.includes(eff) ? eff : th.modes[0];
+      return `<div class="th-prev" data-theme="${th.id}" data-mode="${mode}" aria-hidden="true"><div class="p-nav"><i class="on"></i><i></i><i></i><i></i></div><div class="p-main"><div class="p-card"><b>Подключения</b><div class="p-row"><span class="p-dot"></span><span>Cisco</span></div><span class="p-btn">Включить</span></div></div></div>`; };
+    const accent = (AP.values.accent && AP.values.accent.m === "own") ? AP.values.accent.v : null;
+    body = `<h2>Как будет выглядеть VPNer?</h2>
+      <p class="lead">Выберите тему — установщик сразу примет её вид. Позже всё можно поменять в «Оформлении».</p>
+      <div class="themes">${THEMES.map(th => `<button class="theme-card ${th.id === t.id ? "on" : ""}" data-th="${th.id}" aria-pressed="${th.id === t.id}">${prev(th)}<span class="tc-info"><b>${esc(th.name)}</b><small>${esc(th.desc)}</small></span></button>`).join("")}</div>
+      <div class="wiz-row"><span class="wiz-label">Режим</span><div class="seg" id="ap-mode">${[["system", "Как в Windows"], ["light", "Светлая"], ["dark", "Тёмная"]].map(([m, l]) => `<button data-m="${m}" class="${AP.mode === m ? "on" : ""}" ${t.modes.length === 1 ? "disabled" : ""}>${l}</button>`).join("")}</div></div>
+      <div class="wiz-row"><span class="wiz-label">Акцент</span><div class="wiz-accents">${SETUP_ACCENTS.map(c => `<button class="${(c || null) === accent ? "on" : ""}" data-accent="${c || ""}" title="${c ? c : "Как в теме"}" aria-label="${c ? "Акцент " + c : "Акцент как в теме"}" style="--sw:${c || "var(--accent)"}">${c ? "" : "Т"}</button>`).join("")}</div></div>
+      <div class="wiz-row"><span class="wiz-label">Анимации</span><label class="check"><input type="checkbox" class="switch" id="ap-anim" ${AP.anim !== false ? "checked" : ""}><span style="color:var(--muted);font-size:12.5px">${t.fx.length ? "эффекты темы «" + esc(t.name) + "»" : "анимации окон и переходов"}</span></label></div>`;
+    foot = `<button class="btn" data-go="welcome">Назад</button><button class="btn primary big" data-go="options">Далее</button>`;
+  } else if (st === "options") {
+    body = `<h2>Параметры установки</h2>
+      <div class="field" style="margin-top:14px"><span>Папка</span><input type="text" id="wz-dir" value="${esc(o.dir)}" spellcheck="false"><span class="help">Настройки и подключения хранятся отдельно, в профиле пользователя, и при обновлении не теряются.</span></div>
+      ${[["startMenu", "Ярлык в меню «Пуск»"], ["desktop", "Ярлык на рабочем столе"], ["autostart", "Запускать вместе с Windows", "Свёрнутой в трей, без запроса UAC. Маршрутизация сама не включится — это отдельная настройка."], ["launch", "Запустить VPNer после установки"]]
+        .map(([k, l, h]) => `<label class="check wiz-opt"><input type="checkbox" class="switch" data-opt="${k}" ${o[k] ? "checked" : ""}><span><b style="font-size:13px">${l}</b>${h ? `<br><span style="color:var(--muted);font-size:12.5px">${h}</span>` : ""}</span></label>`).join("")}
+      ${SETUP.info.running ? `<div class="banner warn" style="margin:14px 0 0">VPNer сейчас запущен. Установщик закроет его — все VPN-подключения отключатся.</div>` : ""}`;
+    foot = `<button class="btn" data-go="theme">Назад</button><button class="btn primary big" id="wz-install">${SETUP.info.installed ? "Обновить" : "Установить"}</button>`;
+  } else if (st === "install" || st === "done") {
+    const s = SETUP.status || { steps: [] };
+    body = `<h2>${st === "done" ? "Готово" : s.error ? "Установка не удалась" : "Установка…"}</h2>
+      ${st === "done" ? `<p class="lead">VPNer установлен. Он находится в меню «Пуск»${o.desktop ? " и на рабочем столе" : ""}.</p>` : ""}
+      <div class="inst-log">${(s.steps || []).map(x => `<div class="${x.done ? "ok" : ""}"><span>${x.done ? "✓" : "›"}</span>${esc(x.text)}</div>`).join("")}</div>
+      ${s.installing ? `<div class="progress indet" style="margin-top:12px"><div></div></div>` : ""}
+      ${s.error ? `<div class="banner bad" style="margin:14px 0 0">${esc(s.error)}</div>` : ""}
+      ${st === "done" ? `<label class="check wiz-opt" style="margin-top:16px"><input type="checkbox" class="switch" id="wz-launch" ${o.launch ? "checked" : ""}><span><b style="font-size:13px">Запустить VPNer</b></span></label>` : ""}`;
+    foot = st === "done" ? `<span></span><button class="btn primary big" id="wz-finish">Готово</button>`
+      : s.error ? `<button class="btn" data-go="options">Назад</button><button class="btn primary big" id="wz-install">Повторить</button>` : `<span></span><span></span>`;
+  }
+  v.innerHTML = `<div class="wiz">${setupHead()}<div class="wiz-body">${body}</div><div class="wiz-foot">${foot}</div></div>`;
+  setupWire();
+}
+function setupWire() {
+  const v = $("#view"), o = SETUP.opts;
+  v.querySelectorAll("[data-go]").forEach(b => b.onclick = () => setupGo(b.dataset.go));
+  v.querySelectorAll("[data-th]").forEach(b => b.onclick = () => { AP.theme = b.dataset.th; apSave(); typedTab = null; setupGo("theme"); });
+  v.querySelectorAll("#ap-mode [data-m]").forEach(b => b.onclick = () => { AP.mode = b.dataset.m; apSave(); renderSetup(); });
+  v.querySelectorAll("[data-accent]").forEach(b => b.onclick = () => {
+    if (b.dataset.accent) AP.values.accent = { m: "own", v: b.dataset.accent }; else delete AP.values.accent;
+    apSave(); renderSetup();
+  });
+  const anim = $("#ap-anim");
+  if (anim) anim.onchange = () => { AP.anim = anim.checked; apSave(); };
+  v.querySelectorAll("[data-opt]").forEach(el => el.onchange = () => { o[el.dataset.opt] = el.checked; });
+  const dir = $("#wz-dir");
+  if (dir) dir.oninput = () => { o.dir = dir.value; };
+  const go = $("#wz-install");
+  if (go) go.onclick = setupInstall;
+  const fin = $("#wz-finish");
+  if (fin) fin.onclick = async () => { fin.disabled = true; await api("POST", "/api/setup/finish", { launch: $("#wz-launch").checked }).catch(() => {}); };
+}
+async function setupInstall() {
+  if (!SETUP.opts.dir.trim()) return notice("Укажите папку установки.", { title: "Установка" });
+  if (SETUP.info.running && !await ask("VPNer сейчас запущен. Он будет закрыт, все VPN-подключения отключатся.", { title: "Закрыть VPNer?", ok: "Закрыть и установить" })) return;
+  clearTimeout(apSaveTimer); // the chosen look must reach the installer first
+  await api("PUT", "/api/appearance", AP).catch(() => {});
+  try { await api("POST", "/api/setup/install", SETUP.opts); } catch (e) { return notice(e.message, { title: "Установка" }); }
+  SETUP.status = { steps: [], installing: true };
+  setupGo("install");
+  const tick = async () => {
+    try { SETUP.status = await api("GET", "/api/setup/status"); } catch (e) {}
+    if (SETUP.status.done) return setupGo("done");
+    renderSetup();
+    if (SETUP.status.installing) SETUP.poll = setTimeout(tick, 350);
+  };
+  tick();
 }
 
 // ---------- «Оформление» tab ----------

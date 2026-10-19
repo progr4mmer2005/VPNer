@@ -2,3 +2,4 @@
 build/
 dist/
 internal/assets/agent/*.gz
+cmd/vpner-setup/payload/vpner.exe.gz

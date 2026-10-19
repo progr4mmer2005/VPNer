@@ -72,7 +72,10 @@ func (s *Server) Close() {
 
 // guard: only loopback Host headers (DNS-rebinding protection) and a token
 // for every API call (CSRF protection).
-func (s *Server) guard(next http.Handler) http.Handler {
+func (s *Server) guard(next http.Handler) http.Handler { return Guard(s.Token, next) }
+
+// Guard is the protection of the UI server, shared with the setup wizard.
+func Guard(token string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		host, _, _ := net.SplitHostPort(r.Host)
 		if host != "127.0.0.1" && host != "localhost" {
@@ -86,7 +89,7 @@ func (s *Server) guard(next http.Handler) http.Handler {
 			if tok == "" {
 				tok = r.URL.Query().Get("token")
 			}
-			if subtle.ConstantTimeCompare([]byte(tok), []byte(s.Token)) != 1 {
+			if subtle.ConstantTimeCompare([]byte(tok), []byte(token)) != 1 {
 				http.Error(w, "unauthorized", http.StatusUnauthorized)
 				return
 			}
@@ -119,7 +122,14 @@ type connDTO struct {
 
 // page is the UI with the saved theme already in it, so the window opens
 // in its look instead of flashing the standard one first.
-func (s *Server) page() []byte {
+func (s *Server) page() []byte { return Page(s.App.Config().Appearance, "") }
+
+// CSP is the content security policy of the UI page.
+const CSP = "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data:"
+
+// Page is the UI page with a saved look put in (see appearance in the UI)
+// and an optional extra script, e.g. the setup wizard's start data.
+func Page(appearance json.RawMessage, extra string) []byte {
 	var a struct {
 		Look *struct {
 			T   string `json:"t"`
@@ -128,18 +138,19 @@ func (s *Server) page() []byte {
 		} `json:"look"`
 	}
 	look := []byte("null")
-	if raw := s.App.Config().Appearance; len(raw) > 0 && json.Unmarshal(raw, &a) == nil && a.Look != nil {
+	if raw := appearance; len(raw) > 0 && json.Unmarshal(raw, &a) == nil && a.Look != nil {
 		if b, err := json.Marshal(a.Look); err == nil { // also escapes <, > and &
 			look = b
 		}
 	}
-	return bytes.Replace(indexHTML, []byte("<!--vpner-look-->"), append(append([]byte("<script>window.VPNER_LOOK = "), look...), []byte(";</script>")...), 1)
+	script := "<script>window.VPNER_LOOK = " + string(look) + ";" + extra + "</script>"
+	return bytes.Replace(indexHTML, []byte("<!--vpner-look-->"), []byte(script), 1)
 }
 
 func (s *Server) routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Header().Set("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data:")
+		w.Header().Set("Content-Security-Policy", CSP)
 		w.Write(s.page())
 	})
 

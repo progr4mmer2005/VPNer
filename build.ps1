@@ -66,6 +66,15 @@ foreach ($a in $targets) {
     & $go build -trimpath -ldflags "$ldflags -H windowsgui" -o $out .\cmd\vpner
     if ($LASTEXITCODE) { throw 'app build failed' }
     Write-Host ("  -> {0} ({1:N1} MB)" -f $out, ((Get-Item $out).Length / 1MB))
+
+    # 3. Installer with the program inside
+    GzipFile (Resolve-Path $out) "$PWD\cmd\vpner-setup\payload\vpner.exe.gz"
+    $setup = if ($targets.Count -gt 1) { "dist\vpner-setup-$a.exe" } else { 'dist\vpner-setup.exe' }
+    Write-Host "Building $setup ..."
+    & $go build -trimpath -ldflags "$ldflags -H windowsgui" -o $setup .\cmd\vpner-setup
+    if ($LASTEXITCODE) { throw 'setup build failed' }
+    Remove-Item cmd\vpner-setup\payload\vpner.exe.gz
+    Write-Host ("  -> {0} ({1:N1} MB)" -f $setup, ((Get-Item $setup).Length / 1MB))
 }
 Remove-Item Env:GOOS, Env:GOARCH
 Write-Host 'Done.'

@@ -209,6 +209,14 @@ func AttachParentConsole() bool {
 	return true
 }
 
+// Ask shows a native Yes/No question and reports whether Yes was chosen.
+func Ask(title, text string) bool {
+	t, _ := windows.UTF16PtrFromString(title)
+	m, _ := windows.UTF16PtrFromString(text)
+	r, _ := windows.MessageBox(0, m, t, windows.MB_YESNO|windows.MB_ICONQUESTION|windows.MB_SETFOREGROUND)
+	return r == 6 // IDYES
+}
+
 // MessageBox shows a native dialog (used for fatal startup errors).
 func MessageBox(title, text string, isError bool) {
 	t, _ := windows.UTF16PtrFromString(title)

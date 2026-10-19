@@ -19,6 +19,7 @@ import (
 
 	"vpner/internal/app"
 	"vpner/internal/firewall"
+	"vpner/internal/install"
 	"vpner/internal/web"
 	"vpner/internal/winutil"
 )
@@ -72,7 +73,7 @@ func main() {
 		return
 	case "help", "/?":
 		winutil.AttachParentConsole()
-		fmt.Println("vpner.exe            запустить программу (окно + значок в трее)\nvpner.exe --tray     запустить свёрнутой в трей\nvpner.exe restore    аварийно восстановить сеть (снять kill-switch)\nvpner.exe version")
+		fmt.Println("vpner.exe            запустить программу (окно + значок в трее)\nvpner.exe --tray     запустить свёрнутой в трей\nvpner.exe restore    аварийно восстановить сеть (снять kill-switch)\nvpner.exe uninstall  удалить программу\nvpner.exe version")
 		return
 	}
 
@@ -86,6 +87,17 @@ func main() {
 	}
 
 	dir := dataDir()
+	if cmd == "uninstall" {
+		if !winutil.Ask("Удаление VPNer", "Удалить VPNer с этого компьютера?\n\nВсе VPN-подключения будут отключены, сеть вернётся в обычный режим.") {
+			return
+		}
+		removeData := winutil.Ask("Удаление VPNer", "Удалить также настройки, подключения, сохранённые пароли и контейнер WSL?\n\n«Нет» — они останутся, и при повторной установке всё будет на месте.")
+		if err := install.Uninstall(removeData); err != nil {
+			fatal("Не удалось удалить VPNer: " + err.Error())
+		}
+		winutil.MessageBox("VPNer", "VPNer удалён.", false)
+		return
+	}
 	if cmd == "restore" {
 		winutil.AttachParentConsole()
 		ks := &firewall.KillSwitch{StateDir: dir}

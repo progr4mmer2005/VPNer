@@ -339,6 +339,7 @@ details > summary { cursor: pointer; color: var(--muted); margin: 6px 0 12px; us
 .swatch.font { font-family: var(--sw); background: var(--panel2); }
 .ap-sub { font-weight: 600; font-size: 13px; color: var(--muted); margin: 14px 0 2px; }
 .fx-list { display: flex; flex-direction: column; gap: 4px; margin-top: 12px; }
+.fx-list.off { opacity: .5; }
 .cc-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--cc, var(--muted)); flex: none; display: inline-block; }
 .card.cc { box-shadow: inset 3px 0 0 var(--cc), var(--shadow); }
 @container aprows (max-width: 640px) {
@@ -392,21 +393,25 @@ input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px va
 :root[data-theme="cli"] input[type=range]::-webkit-slider-thumb { width: 10px; height: 14px; margin-top: 0; border-radius: 0; border: none; box-shadow: none; background: var(--accent); }
 
 /* ---------- effects layers ---------- */
-#fx-rain, #fx-scan, #fx-noise { position: fixed; inset: 0; pointer-events: none; display: none; }
+#fx-rain, #fx-scan, #fx-flicker, #fx-beam, #fx-noise { position: fixed; inset: 0; pointer-events: none; display: none; }
 #fx-rain { z-index: 0; width: 100%; height: 100%; opacity: .55; }
-#fx-scan { z-index: 70; background: repeating-linear-gradient(to bottom, transparent 0 2px, rgba(0,0,0,.22) 2px 3px), radial-gradient(130% 100% at 50% 50%, transparent 60%, rgba(0,0,0,.35) 100%); animation: fx-flicker 4s steps(40) infinite; }
-#fx-scan::after { content: ""; position: absolute; left: 0; right: 0; height: 120px; top: -120px; background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--accent) 7%, transparent), transparent); animation: fx-beam 7s linear infinite; }
-@keyframes fx-flicker { 0%, 100% { opacity: 1; } 48% { opacity: .92; } 50% { opacity: 1; } 73% { opacity: .96; } }
+#fx-scan { z-index: 70; background: repeating-linear-gradient(to bottom, transparent 0 2px, rgba(0,0,0,.22) 2px 3px), radial-gradient(130% 100% at 50% 50%, transparent 60%, rgba(0,0,0,.35) 100%); }
+#fx-flicker { z-index: 69; background: rgba(0,0,0,.07); opacity: 0; animation: fx-flicker 4s steps(40) infinite; }
+#fx-beam { z-index: 70; bottom: auto; height: 120px; top: -120px; background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--accent) 7%, transparent), transparent); animation: fx-beam 7s linear infinite; }
+@keyframes fx-flicker { 0%, 100% { opacity: 0; } 47% { opacity: 0; } 48% { opacity: 1; } 50% { opacity: 0; } 72% { opacity: 0; } 73% { opacity: .6; } 74% { opacity: 0; } }
 @keyframes fx-beam { to { top: 100%; } }
 #fx-noise { z-index: 71; opacity: 0; mix-blend-mode: screen;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1.6 -.5'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E"); }
-:root.fx-rain #fx-rain, :root.fx-scan #fx-scan, :root.fx-glitchable #fx-noise { display: block; }
+:root.fx-rain #fx-rain, :root.fx-scan #fx-scan, :root.fx-flicker #fx-flicker, :root.fx-beam #fx-beam, :root.fx-glitchable #fx-noise { display: block; }
 :root.fx-glitch #fx-noise { opacity: .16; animation: fx-noise .12s steps(3) infinite; }
 @keyframes fx-noise { 0% { background-position: 0 0; clip-path: inset(10% 0 70% 0); } 33% { background-position: 40px 70px; clip-path: inset(55% 0 20% 0); } 66% { background-position: -60px 20px; clip-path: inset(30% 0 45% 0); } 100% { background-position: 20px -40px; clip-path: inset(80% 0 4% 0); } }
 :root.fx-glitch main > .content, :root.fx-glitch header.top { animation: fx-jitter .1s steps(2) infinite; }
 :root.fx-glitch h2, :root.fx-glitch .brand, :root.fx-glitch .status .big, :root.fx-glitch .card .name { text-shadow: 2px 0 rgba(255,40,90,.8), -2px 0 rgba(0,230,255,.8); }
 @keyframes fx-jitter { 0% { transform: translate(0, 0); } 25% { transform: translate(-3px, 1px) skewX(-1deg); } 50% { transform: translate(2px, -1px); } 75% { transform: translate(-1px, 0) skewX(1deg); } 100% { transform: translate(1px, 1px); } }
-:root.fx-paused #fx-scan, :root.fx-paused #fx-scan::after, :root.fx-paused body::before { animation-play-state: paused; }
+:root.fx-paused #fx-flicker, :root.fx-paused #fx-beam, :root.fx-paused body::before { animation-play-state: paused; }
+/* «Анимации» off: nothing on screen moves, like Windows "reduce animations" */
+:root.no-anim *, :root.no-anim *::before, :root.no-anim *::after { animation: none !important; transition: none !important; }
+:root.no-anim .progress.indet > div { animation: indet 1.2s infinite ease-in-out !important; } /* a busy indicator is not decoration */
 
 /* ---------- theme: CLI / terminal ----------
    Blocks are framed with text characters (border-image built in JS from the
@@ -469,14 +474,15 @@ input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px va
 :root[data-theme="cli"] .r-actions .sep { width: 8px; height: 14px; margin: 0 2px; background: var(--cli-vline) center / 8px 14px no-repeat; }
 /* text decorations */
 :root[data-theme="cli"] .brand { font-weight: 700; letter-spacing: 1px; }
-:root[data-theme="cli"] .brand::after { content: "_"; color: var(--accent); animation: cli-blink 1.1s steps(1) infinite; margin-left: -8px; }
+:root[data-theme="cli"] .brand::after { content: "_"; color: var(--accent); margin-left: -8px; }
 :root[data-theme="cli"] nav a { padding-left: 8px; }
 :root[data-theme="cli"] nav a::before { content: "\00a0\00a0"; color: var(--accent); }
 :root[data-theme="cli"] nav a:hover { background: color-mix(in srgb, var(--accent) 9%, transparent); }
 :root[data-theme="cli"] nav a.active { background: transparent; color: var(--accent); font-weight: 600; }
 :root[data-theme="cli"] nav a.active::before { content: "▸\00a0"; }
 :root[data-theme="cli"] h2::before { content: "❯ "; color: var(--accent); }
-:root[data-theme="cli"] h2::after { content: "▌"; color: var(--accent); margin-left: 4px; animation: cli-blink 1.1s steps(1) infinite; font-weight: 400; }
+:root[data-theme="cli"] h2::after { content: "▌"; color: var(--accent); margin-left: 4px; font-weight: 400; }
+:root.fx-cursor[data-theme="cli"] .brand::after, :root.fx-cursor[data-theme="cli"] h2::after { animation: cli-blink 1.1s steps(1) infinite; }
 :root[data-theme="cli"] h3::before { content: "## "; color: var(--muted); }
 :root[data-theme="cli"] .lead { color: color-mix(in srgb, var(--text) 58%, var(--bg)); }
 :root[data-theme="cli"] .lead::before { content: "# "; color: var(--muted); }
@@ -503,7 +509,7 @@ input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px va
 :root[data-theme="cli"] input[type=checkbox].switch::after { box-shadow: none; background: var(--panel); }
 :root[data-theme="cli"] input[type=checkbox].switch:checked { background: var(--accent); }
 :root[data-theme="cli"] input[type=checkbox].switch:checked::after { background: var(--on-accent); }
-:root[data-theme="cli"] .dot.warn { animation: cli-blink 1.4s steps(1) infinite; }
+:root.fx-cursor[data-theme="cli"] .dot.warn { animation: cli-blink 1.4s steps(1) infinite; }
 :root[data-theme="cli"] .dot.ok, :root[data-theme="cli"] .dot.warn, :root[data-theme="cli"] .dot.bad { box-shadow: none; }
 :root[data-theme="cli"] .badge { background: transparent !important; border: none !important; padding: 0 2px; }
 :root[data-theme="cli"] .badge::before { content: "<"; } :root[data-theme="cli"] .badge::after { content: ">"; }
@@ -551,6 +557,7 @@ input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px va
 @keyframes glass-drift { 0% { transform: translate(0, 0) rotate(0deg) scale(1); } 50% { transform: translate(6%, -4%) rotate(18deg) scale(1.08); } 100% { transform: translate(-5%, 5%) rotate(-12deg) scale(.96); } }
 :root[data-theme="glass"] nav, :root[data-theme="glass"] .card, :root[data-theme="glass"] .panel, :root[data-theme="glass"] .rule, :root[data-theme="glass"] .dns-srv,
 :root[data-theme="glass"] table, :root[data-theme="glass"] .logs, :root[data-theme="glass"] .type, :root[data-theme="glass"] .theme-card, :root[data-theme="glass"] .empty,
+:root[data-theme="cli"][data-mode="light"] #fx-flicker { background: rgba(60,50,30,.05); }
 :root[data-theme="glass"] .ctx-menu, :root[data-theme="glass"] .modal, :root[data-theme="glass"] .toast {
   background: var(--glass); backdrop-filter: blur(28px) saturate(1.6); -webkit-backdrop-filter: blur(28px) saturate(1.6); border-color: var(--glass-line); }
 :root[data-theme="glass"] nav { background: var(--glass-strong); border-right: 1px solid var(--glass-line); }
@@ -841,11 +848,15 @@ const THEMES = [
   { id: "standard", name: "Стандарт", desc: "Спокойный интерфейс в стиле Windows", modes: ["light", "dark"], fx: [] },
   { id: "cli", name: "CLI / терминал", desc: "Моноширинный шрифт, рамки из символов, бегущие символы и помехи", modes: ["light", "dark"], fx: [
     { id: "frame", label: "Рамки блоков", help: "Из каких символов нарисованы границы", choices: [["ascii", "+---+  ASCII"], ["line", "┌───┐  линии"], ["double", "╔═══╗  двойные"]] },
-    { id: "rain", label: "Бегущие символы", help: "Символы стекают по фону окна, как в терминале из фильмов" },
+    { id: "rain", label: "Падающие символы", help: "Символы стекают по фону окна, как в терминале из фильмов" },
+    { id: "scan", label: "Эффект CRT", help: "Строки развёртки и затемнённые края, как у лампового монитора" },
+    { id: "flicker", label: "Мерцание экрана", help: "Лёгкое неровное мерцание старого монитора" },
+    { id: "beam", label: "Бегущий луч", help: "Светлая полоса медленно проходит сверху вниз" },
     { id: "glitch", label: "Помехи", help: "Редкие сбои изображения: дрожание, цветовые искажения, шум" },
-    { id: "scan", label: "Развёртка", help: "Строки, мерцание и бегущий луч, как у старого монитора" },
     { id: "decrypt", label: "Расшифровка экрана", help: "При переключении вкладок и любом изменении текст собирается из перебираемых символов" },
-    { id: "type", label: "Печать и перебор", help: "Заголовки вкладок печатаются по буквам (после расшифровки экрана), пункты меню перебирают символы при наведении" },
+    { id: "type", label: "Печать заголовков", help: "Заголовок вкладки печатается по буквам (после расшифровки экрана)" },
+    { id: "hover", label: "Перебор в меню", help: "Пункты меню перебирают символы при наведении" },
+    { id: "cursor", label: "Мигающий курсор", help: "Курсор после заголовков и названия программы, мигание статуса «Ожидание»" },
   ] },
   { id: "glass", name: "Стекло", desc: "Полупрозрачные панели и размытие в духе Windows 11", modes: ["light", "dark"], fx: [
     { id: "blobs", label: "Живой фон", help: "Цветные пятна медленно плывут за стеклом" },
@@ -894,7 +905,7 @@ function connParams() {
 }
 const apParam = id => AP_PARAMS.find(p => p.id === id) || connParams().find(p => p.id === id);
 const apTheme = () => THEMES.find(t => t.id === AP.theme) || THEMES[0];
-const fxOn = id => AP.fx[id] !== false && !matchMedia("(prefers-reduced-motion: reduce)").matches;
+const fxOn = id => AP.anim !== false && AP.fx[id] !== false && !matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 // Character frames of the CLI theme: a 3x3 cell SVG (corners, edges) used
 // as border-image, drawn in the current colors.
@@ -983,7 +994,7 @@ function fxUpdate() {
 }
 function fxLayers() {
   if ($("#fx-rain")) return;
-  document.body.insertAdjacentHTML("afterbegin", `<canvas id="fx-rain" aria-hidden="true"></canvas><div id="fx-scan" aria-hidden="true"></div><div id="fx-noise" aria-hidden="true"></div>`);
+  document.body.insertAdjacentHTML("afterbegin", `<canvas id="fx-rain" aria-hidden="true"></canvas><div id="fx-scan" aria-hidden="true"></div><div id="fx-flicker" aria-hidden="true"></div><div id="fx-beam" aria-hidden="true"></div><div id="fx-noise" aria-hidden="true"></div>`);
 }
 // Plain characters (digits, latin, symbols) on a fixed grid: every glyph
 // gets its own cell, so nothing is printed over anything else.
@@ -1011,9 +1022,14 @@ function rainStart() {
     const cs = getComputedStyle(document.documentElement);
     const bg = cs.getPropertyValue("--bg").trim(), accent = cs.getPropertyValue("--accent").trim(), text = cs.getPropertyValue("--text").trim();
     ctx.globalAlpha = .09; ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h); // trails fade out
+  root.classList.toggle("no-anim", AP.anim === false);
     ctx.font = `${size - 3}px ${cs.getPropertyValue("--mono")}`;
+  root.classList.toggle("fx-flicker", t === "cli" && on("flicker"));
+  root.classList.toggle("fx-beam", t === "cli" && on("beam"));
+  root.classList.toggle("fx-cursor", t === "cli" && on("cursor"));
     ctx.textBaseline = "middle"; ctx.textAlign = "center";
     const cell = (x, row, ch, color, alpha) => {
+  if (t === "cli" && ["scan", "flicker", "beam"].some(on)) fxLayers();
       ctx.globalAlpha = 1; ctx.fillStyle = bg; ctx.fillRect(x, row * size, size, size);
       ctx.globalAlpha = alpha; ctx.fillStyle = color; ctx.fillText(ch, x + size / 2, row * size + size / 2);
     };
@@ -1157,7 +1173,7 @@ function fxTypeHeading() {
 }
 document.addEventListener("mouseover", e => {
   const a = e.target.closest && e.target.closest("nav a");
-  if (a && !a.contains(e.relatedTarget) && apTheme().id === "cli" && fxOn("type")) scrambleOnce(a, 320);
+  if (a && !a.contains(e.relatedTarget) && apTheme().id === "cli" && fxOn("hover")) scrambleOnce(a, 320);
 });
 
 // ---------- own color picker (instead of the browser's) ----------
@@ -1286,10 +1302,14 @@ function renderAppearance() {
     <div class="panel"><h3>Режим</h3>
       <div class="seg" id="ap-mode">${[["system", "Как в Windows"], ["light", "Светлая"], ["dark", "Тёмная"]].map(([m, l]) => `<button data-m="${m}" class="${AP.mode === m ? "on" : ""}" ${t.modes.length === 1 ? "disabled" : ""}>${l}</button>`).join("")}</div>
       ${t.modes.length === 1 ? `<p class="help" style="color:var(--muted);font-size:12.5px;margin:8px 0 0">У темы «${esc(t.name)}» только ${t.modes[0] === "dark" ? "тёмный" : "светлый"} вариант.</p>` : ""}
-      ${t.fx.length ? `<div class="fx-list"><div class="ap-sub">Эффекты темы</div>${t.fx.map(f => f.choices
-        ? `<div class="field" style="margin:0 0 6px"><span>${esc(f.label)}</span><select data-fxsel="${f.id}" style="max-width:260px;font-family:var(--mono)">${f.choices.map(([v, l]) => `<option value="${v}" ${(AP.fx[f.id] || f.choices[0][0]) === v ? "selected" : ""}>${esc(l)}</option>`).join("")}</select><span class="help">${esc(f.help)}</span></div>`
-        : `<label class="check"><input type="checkbox" class="switch" data-fx="${f.id}" ${AP.fx[f.id] !== false ? "checked" : ""}><span><b style="font-size:13px">${esc(f.label)}</b><br><span style="color:var(--muted);font-size:12.5px">${esc(f.help)}</span></span></label>`).join("")}
-        ${matchMedia("(prefers-reduced-motion: reduce)").matches ? `<p class="help" style="color:var(--warn);font-size:12.5px;margin:4px 0 0">В Windows включено «Уменьшение анимации» — эффекты не показываются.</p>` : ""}</div>` : ""}
+      ${t.fx.filter(f => f.choices).map(f => `<div class="field" style="margin:14px 0 0"><span>${esc(f.label)}</span><select data-fxsel="${f.id}" style="max-width:260px;font-family:var(--mono)">${f.choices.map(([v, l]) => `<option value="${v}" ${(AP.fx[f.id] || f.choices[0][0]) === v ? "selected" : ""}>${esc(l)}</option>`).join("")}</select><span class="help">${esc(f.help)}</span></div>`).join("")}
+    </div>
+    <div class="panel"><h3>Анимации и эффекты</h3>
+      <label class="check"><input type="checkbox" class="switch" id="ap-anim" ${AP.anim !== false ? "checked" : ""}><span><b style="font-size:13px">Анимации</b><br><span style="color:var(--muted);font-size:12.5px">Все анимации и эффекты программы во всех темах. Если выключить — ничего на экране не движется.</span></span></label>
+      ${t.fx.some(f => !f.choices) ? `<div class="fx-list ${AP.anim === false ? "off" : ""}"><div class="ap-sub">Эффекты темы «${esc(t.name)}»</div>${t.fx.filter(f => !f.choices).map(f => `<label class="check"><input type="checkbox" class="switch" data-fx="${f.id}" ${AP.fx[f.id] !== false ? "checked" : ""} ${AP.anim === false ? "disabled" : ""}><span><b style="font-size:13px">${esc(f.label)}</b><br><span style="color:var(--muted);font-size:12.5px">${esc(f.help)}</span></span></label>`).join("")}
+        <div class="row" style="margin-top:6px"><button class="btn small" data-fx-all="1" ${AP.anim === false ? "disabled" : ""}>Включить все</button><button class="btn small" data-fx-all="0" ${AP.anim === false ? "disabled" : ""}>Выключить все</button></div></div>`
+        : `<p class="help" style="color:var(--muted);font-size:12.5px;margin:10px 0 0">У темы «${esc(t.name)}» нет своих эффектов — переключатель отвечает за анимации окон и переходов.</p>`}
+      ${matchMedia("(prefers-reduced-motion: reduce)").matches ? `<p class="help" style="color:var(--warn);font-size:12.5px;margin:8px 0 0">В Windows включено «Уменьшение анимации» — эффекты не показываются.</p>` : ""}
     </div>
     <div class="panel"><h3>Основные</h3><div class="ap-rows">${general.map(apRow).join("")}</div></div>
     <div class="panel"><h3>Особые элементы</h3><p class="help" style="color:var(--muted);font-size:12.5px;margin:-4px 0 6px">У этих элементов свой смысл и своё значение, независимое от общих настроек. Его можно оставить как в теме, привязать к общему, задать вручную или взять из своей переменной.</p>
@@ -1356,6 +1376,11 @@ function apWire() {
   $("#ap-reset-all").onclick = async () => {
     if (!await ask("Тема, режим, все свои значения и переменные вернутся к стандартным.", { title: "Сбросить оформление?", ok: "Сбросить", danger: true })) return;
     AP = AP_DEFAULT(); apSave(); renderAppearance();
+  $("#ap-anim").onchange = e => { AP.anim = e.target.checked; apSave(); renderAppearance(); };
+  view.querySelectorAll("[data-fx-all]").forEach(b => b.onclick = () => {
+    for (const f of apTheme().fx) if (!f.choices) AP.fx[f.id] = b.dataset.fxAll === "1";
+    apSave(); renderAppearance();
+  });
   };
 }
 // apBindEditor wires a value editor (color picker + hex, range, font list).

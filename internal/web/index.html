@@ -368,20 +368,66 @@ input[type=color].picker::-webkit-color-swatch { border: none; border-radius: ma
 @keyframes fx-jitter { 0% { transform: translate(0, 0); } 25% { transform: translate(-3px, 1px) skewX(-1deg); } 50% { transform: translate(2px, -1px); } 75% { transform: translate(-1px, 0) skewX(1deg); } 100% { transform: translate(1px, 1px); } }
 :root.fx-paused #fx-scan, :root.fx-paused #fx-scan::after, :root.fx-paused body::before { animation-play-state: paused; }
 
-/* ---------- theme: CLI / terminal ---------- */
+/* ---------- theme: CLI / terminal ----------
+   Blocks are framed with text characters (border-image built in JS from the
+   chosen frame style and the current colors: --cli-frame, --cli-frame-hi,
+   --cli-hline, --cli-vline). No rounded corners anywhere. */
 [data-theme="cli"] {
   color-scheme: dark;
   --bg: #0b0d0c; --panel: #111412; --text: #d4dad2;
   --accent: #e8875a; --on-accent: #0b0d0c; --ok: #7ee787; --warn: #e3b341; --bad: #ff6b6b;
   --c-native: #79c0ff; --c-wsl: #d2a8ff; --c-vm: #ffa657;
-  --radius: 3px; --r-btn: 2px; --r-modal: 4px; --r-badge: 2px;
+  --radius: 0px; --r-btn: 0px; --r-modal: 0px; --r-badge: 0px;
   --font: "Cascadia Mono", "Cascadia Code", Consolas, "Courier New", monospace;
   --mono: "Cascadia Mono", "Cascadia Code", Consolas, monospace;
+  --frame: color-mix(in srgb, var(--text) 34%, var(--panel));
   --shadow: none; --overlay: rgba(0,0,0,.66);
+}
+/* light: a terminal printed on paper */
+[data-theme="cli"][data-mode="light"] {
+  color-scheme: light;
+  --bg: #f4f1e8; --panel: #faf8f2; --text: #26251f;
+  --accent: #b9532a; --on-accent: #faf8f2; --ok: #2e7d32; --warn: #946200; --bad: #c62828;
+  --c-native: #1f63a8; --c-wsl: #7446b3; --c-vm: #a85300;
+  --frame: color-mix(in srgb, var(--text) 42%, var(--panel));
+  --overlay: rgba(40,36,28,.35);
 }
 :root[data-theme="cli"] body { font-size: 13.5px; letter-spacing: .1px; }
 :root[data-theme="cli"] ::selection { background: var(--accent); color: var(--on-accent); }
-:root[data-theme="cli"] nav { background: color-mix(in srgb, var(--panel) 88%, transparent); border-right: 1px solid var(--line); }
+:root[data-theme="cli"] .dot, :root[data-theme="cli"] .cc-dot, :root[data-theme="cli"] input[type=checkbox].switch, :root[data-theme="cli"] input[type=checkbox].switch::after,
+:root[data-theme="cli"] ::-webkit-scrollbar-thumb { border-radius: 0; }
+/* framed blocks */
+:root[data-theme="cli"] .card, :root[data-theme="cli"] .panel, :root[data-theme="cli"] .rule, :root[data-theme="cli"] .dns-srv,
+:root[data-theme="cli"] .table-wrap, :root[data-theme="cli"] .logs, :root[data-theme="cli"] .type, :root[data-theme="cli"] .theme-card,
+:root[data-theme="cli"] .modal, :root[data-theme="cli"] .ctx-menu, :root[data-theme="cli"] .toast, :root[data-theme="cli"] .drop,
+:root[data-theme="cli"] .empty, :root[data-theme="cli"] .list {
+  border-style: solid; border-color: transparent; border-width: 14px 8px; border-image: var(--cli-frame) 14 8 / 14px 8px round;
+  background: color-mix(in srgb, var(--panel) 92%, transparent); background-clip: padding-box; box-shadow: none; }
+:root[data-theme="cli"] .card:hover, :root[data-theme="cli"] .theme-card:hover, :root[data-theme="cli"] .theme-card.on, :root[data-theme="cli"] .type:hover,
+:root[data-theme="cli"] .modal, :root[data-theme="cli"] .rule.moved, :root[data-theme="cli"] .drop.over, :root[data-theme="cli"] .rule-ghost { border-image-source: var(--cli-frame-hi); }
+:root[data-theme="cli"] .card.cc { box-shadow: none; border-image-source: var(--cli-frame); }
+:root[data-theme="cli"] .card.cc:hover { border-image-source: var(--cli-frame-hi); }
+:root[data-theme="cli"] .card.cc .name { color: var(--cc); }
+:root[data-theme="cli"] .card { padding: 2px 8px 4px; }
+:root[data-theme="cli"] .panel { padding: 2px 10px 6px; }
+:root[data-theme="cli"] .rule { padding: 2px 4px 2px 0; }
+:root[data-theme="cli"] .dns-srv { padding: 2px 6px; }
+:root[data-theme="cli"] .modal header { padding-top: 6px; }
+:root[data-theme="cli"] .theme-card.on { box-shadow: none; }
+:root[data-theme="cli"] table { border: none; background: transparent; }
+:root[data-theme="cli"] th, :root[data-theme="cli"] td { border-bottom: 1px dashed var(--frame); }
+:root[data-theme="cli"] th { background: transparent; text-transform: uppercase; letter-spacing: .6px; font-size: 11.5px; }
+:root[data-theme="cli"] .ap-row { border-top: 1px dashed var(--frame); }
+:root[data-theme="cli"] .rule.drop-before { box-shadow: 0 -2px 0 0 var(--accent); }
+:root[data-theme="cli"] .rule.drop-after { box-shadow: 0 2px 0 0 var(--accent); }
+/* single character lines: menu edge, header, save bar, dialog footer */
+:root[data-theme="cli"] nav { border-right: none; padding-right: 18px; background: var(--cli-vline) right top / 8px 14px repeat-y, color-mix(in srgb, var(--panel) 88%, transparent); }
+:root[data-theme="cli"] header.top { border-bottom: none; padding-bottom: 18px; background: var(--cli-hline) left bottom / 8px 14px repeat-x, color-mix(in srgb, var(--bg) 82%, transparent); backdrop-filter: blur(4px); }
+:root[data-theme="cli"] .savebar { border-top: none; padding-top: 18px; background: var(--cli-hline) left top / 8px 14px repeat-x, var(--bg); }
+:root[data-theme="cli"] .modal footer { border-top: none; padding-top: 16px; background: var(--cli-hline) left top / 8px 14px repeat-x; }
+:root[data-theme="cli"] .ctx-menu hr { border: none; height: 14px; margin: 0; background: var(--cli-hline) left center / 8px 14px repeat-x; }
+:root[data-theme="cli"] .r-actions .sep { width: 8px; height: 14px; margin: 0 2px; background: var(--cli-vline) center / 8px 14px no-repeat; }
+/* text decorations */
 :root[data-theme="cli"] .brand { font-weight: 700; letter-spacing: 1px; }
 :root[data-theme="cli"] .brand::after { content: "_"; color: var(--accent); animation: cli-blink 1.1s steps(1) infinite; margin-left: -8px; }
 :root[data-theme="cli"] nav a { padding-left: 8px; }
@@ -389,41 +435,49 @@ input[type=color].picker::-webkit-color-swatch { border: none; border-radius: ma
 :root[data-theme="cli"] nav a:hover { background: color-mix(in srgb, var(--accent) 9%, transparent); }
 :root[data-theme="cli"] nav a.active { background: transparent; color: var(--accent); font-weight: 600; }
 :root[data-theme="cli"] nav a.active::before { content: "▸\00a0"; }
-:root[data-theme="cli"] header.top { background: color-mix(in srgb, var(--bg) 80%, transparent); backdrop-filter: blur(4px); border-bottom: 1px dashed var(--line); }
 :root[data-theme="cli"] h2::before { content: "❯ "; color: var(--accent); }
 :root[data-theme="cli"] h2::after { content: "▌"; color: var(--accent); margin-left: 4px; animation: cli-blink 1.1s steps(1) infinite; font-weight: 400; }
-:root[data-theme="cli"] h3::before { content: "── "; color: var(--muted); }
-:root[data-theme="cli"] .lead { color: color-mix(in srgb, var(--text) 55%, var(--bg)); }
+:root[data-theme="cli"] h3::before { content: "## "; color: var(--muted); }
+:root[data-theme="cli"] .lead { color: color-mix(in srgb, var(--text) 58%, var(--bg)); }
 :root[data-theme="cli"] .lead::before { content: "# "; color: var(--muted); }
-:root[data-theme="cli"] .card, :root[data-theme="cli"] .panel, :root[data-theme="cli"] .rule, :root[data-theme="cli"] .dns-srv,
-:root[data-theme="cli"] table, :root[data-theme="cli"] .logs, :root[data-theme="cli"] .type, :root[data-theme="cli"] .theme-card { background: color-mix(in srgb, var(--panel) 92%, transparent); }
-:root[data-theme="cli"] .card:hover, :root[data-theme="cli"] .panel:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
-:root[data-theme="cli"] .btn:not(.link) { background: transparent; text-transform: lowercase; }
+/* buttons are words in brackets, not boxes */
+:root[data-theme="cli"] .btn:not(.link) { background: transparent; border-color: transparent; text-transform: lowercase; padding-left: 6px; padding-right: 6px; }
 :root[data-theme="cli"] .btn:not(.link)::before { content: "["; color: var(--muted); margin-right: 2px; }
 :root[data-theme="cli"] .btn:not(.link)::after { content: "]"; color: var(--muted); margin-left: 2px; }
-:root[data-theme="cli"] .btn:not(.link):hover { background: color-mix(in srgb, var(--accent) 12%, transparent); border-color: var(--accent); }
-:root[data-theme="cli"] .btn.primary { color: var(--accent); border-color: var(--accent); }
+:root[data-theme="cli"] .btn:not(.link):hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+:root[data-theme="cli"] .btn.primary { color: var(--accent); }
+:root[data-theme="cli"] .btn.primary::before, :root[data-theme="cli"] .btn.primary::after { color: var(--accent); }
 :root[data-theme="cli"] .btn.primary:hover { background: var(--accent); color: var(--on-accent); filter: none; }
 :root[data-theme="cli"] .btn.primary:hover::before, :root[data-theme="cli"] .btn.primary:hover::after { color: var(--on-accent); }
-:root[data-theme="cli"] .btn.danger-fill { background: transparent; color: var(--bad); border-color: var(--bad); }
-:root[data-theme="cli"] input[type=text], :root[data-theme="cli"] input[type=number], :root[data-theme="cli"] input[type=password], :root[data-theme="cli"] select, :root[data-theme="cli"] textarea { background: color-mix(in srgb, var(--bg) 70%, var(--panel)); caret-color: var(--accent); }
-:root[data-theme="cli"] input[type=checkbox].switch { border-radius: 2px; background: color-mix(in srgb, var(--line) 80%, var(--bg)); }
-:root[data-theme="cli"] input[type=checkbox].switch::after { border-radius: 1px; box-shadow: none; background: var(--muted); }
+:root[data-theme="cli"] .btn.danger-fill { background: transparent; color: var(--bad); }
+:root[data-theme="cli"] .icon-btn:hover:not(:disabled) { border-color: transparent; }
+:root[data-theme="cli"] .seg { border: none; background: transparent; padding: 0; }
+:root[data-theme="cli"] .seg button::before { content: "( ) "; color: var(--muted); }
+:root[data-theme="cli"] .seg button.on { box-shadow: none; background: transparent; color: var(--accent); }
+:root[data-theme="cli"] .seg button.on::before { content: "(•) "; color: var(--accent); }
+/* fields: a prompt line instead of a box */
+:root[data-theme="cli"] input[type=text], :root[data-theme="cli"] input[type=number], :root[data-theme="cli"] input[type=password], :root[data-theme="cli"] select, :root[data-theme="cli"] textarea {
+  border: none; border-bottom: 1px dashed var(--frame); background: color-mix(in srgb, var(--bg) 60%, var(--panel)); caret-color: var(--accent); }
+:root[data-theme="cli"] input:focus, :root[data-theme="cli"] select:focus, :root[data-theme="cli"] textarea:focus { box-shadow: none; border-bottom: 1px solid var(--accent); }
+:root[data-theme="cli"] input[type=checkbox].switch { background: color-mix(in srgb, var(--frame) 60%, var(--bg)); }
+:root[data-theme="cli"] input[type=checkbox].switch::after { box-shadow: none; background: var(--panel); }
 :root[data-theme="cli"] input[type=checkbox].switch:checked { background: var(--accent); }
 :root[data-theme="cli"] input[type=checkbox].switch:checked::after { background: var(--on-accent); }
-:root[data-theme="cli"] .dot { border-radius: 1px; }
 :root[data-theme="cli"] .dot.warn { animation: cli-blink 1.4s steps(1) infinite; }
-:root[data-theme="cli"] .badge { background: transparent !important; border: 1px solid currentColor !important; }
+:root[data-theme="cli"] .dot.ok, :root[data-theme="cli"] .dot.warn, :root[data-theme="cli"] .dot.bad { box-shadow: none; }
+:root[data-theme="cli"] .badge { background: transparent !important; border: none !important; padding: 0 2px; }
 :root[data-theme="cli"] .badge::before { content: "<"; } :root[data-theme="cli"] .badge::after { content: ">"; }
-:root[data-theme="cli"] th { text-transform: uppercase; letter-spacing: .6px; font-size: 11.5px; }
-:root[data-theme="cli"] .modal { border: 1px solid var(--accent); box-shadow: 0 0 0 1px var(--bg), 0 0 40px color-mix(in srgb, var(--accent) 25%, transparent); }
+:root[data-theme="cli"] .modal { box-shadow: 0 0 40px color-mix(in srgb, var(--accent) 22%, transparent); }
 :root[data-theme="cli"] .modal header h3::before { content: "┤ "; color: var(--accent); }
 :root[data-theme="cli"] .modal header h3::after { content: " ├"; color: var(--accent); }
-:root[data-theme="cli"] .toast { background: var(--panel); color: var(--text); border: 1px solid var(--accent); }
+:root[data-theme="cli"] .toast { color: var(--text); }
 :root[data-theme="cli"] .toast::before { content: "» "; color: var(--accent); }
-:root[data-theme="cli"] .empty { border-style: dashed; }
-:root[data-theme="cli"] ::-webkit-scrollbar-thumb { border-radius: 0; }
-:root[data-theme="cli"] .cc-dot { border-radius: 1px; }
+:root[data-theme="cli"] .swatch, :root[data-theme="cli"] button.picker { border-style: dashed; }
+/* effects on paper: darker lines, inverted noise */
+:root[data-theme="cli"][data-mode="light"] #fx-rain { opacity: .3; }
+:root[data-theme="cli"][data-mode="light"] #fx-scan { background: repeating-linear-gradient(to bottom, transparent 0 2px, rgba(60,50,30,.06) 2px 3px), radial-gradient(130% 100% at 50% 50%, transparent 65%, rgba(60,50,30,.14) 100%); }
+:root[data-theme="cli"][data-mode="light"] #fx-noise { mix-blend-mode: multiply; filter: invert(1); }
+:root[data-theme="cli"][data-mode="light"].fx-glitch h2, :root[data-theme="cli"][data-mode="light"].fx-glitch .brand, :root[data-theme="cli"][data-mode="light"].fx-glitch .status .big, :root[data-theme="cli"][data-mode="light"].fx-glitch .card .name { text-shadow: 2px 0 rgba(220,0,70,.55), -2px 0 rgba(0,150,200,.55); }
 @keyframes cli-blink { 50% { opacity: 0; } }
 
 /* ---------- theme: glass (Windows 11) ---------- */
@@ -743,11 +797,13 @@ async function restoreNet() { await act(() => api("POST", "/api/restore"), "Се
 // common value. User values survive theme changes.
 const THEMES = [
   { id: "standard", name: "Стандарт", desc: "Спокойный интерфейс в стиле Windows", modes: ["light", "dark"], fx: [] },
-  { id: "cli", name: "CLI / терминал", desc: "Моноширинный шрифт, рамки, бегущие символы и помехи", modes: ["dark"], fx: [
+  { id: "cli", name: "CLI / терминал", desc: "Моноширинный шрифт, рамки из символов, бегущие символы и помехи", modes: ["light", "dark"], fx: [
+    { id: "frame", label: "Рамки блоков", help: "Из каких символов нарисованы границы", choices: [["ascii", "+---+  ASCII"], ["line", "┌───┐  линии"], ["double", "╔═══╗  двойные"]] },
     { id: "rain", label: "Бегущие символы", help: "Символы стекают по фону окна, как в терминале из фильмов" },
     { id: "glitch", label: "Помехи", help: "Редкие сбои изображения: дрожание, цветовые искажения, шум" },
     { id: "scan", label: "Развёртка", help: "Строки, мерцание и бегущий луч, как у старого монитора" },
-    { id: "type", label: "Печать и расшифровка", help: "Заголовки набираются по буквам, пункты меню «расшифровываются» при наведении" },
+    { id: "decrypt", label: "Расшифровка экрана", help: "При переключении вкладок и любом изменении текст собирается из перебираемых символов" },
+    { id: "type", label: "Печать и перебор", help: "Заголовки вкладок печатаются по буквам (после расшифровки экрана), пункты меню перебирают символы при наведении" },
   ] },
   { id: "glass", name: "Стекло", desc: "Полупрозрачные панели и размытие в духе Windows 11", modes: ["light", "dark"], fx: [
     { id: "blobs", label: "Живой фон", help: "Цветные пятна медленно плывут за стеклом" },
@@ -797,6 +853,32 @@ function connParams() {
 const apParam = id => AP_PARAMS.find(p => p.id === id) || connParams().find(p => p.id === id);
 const apTheme = () => THEMES.find(t => t.id === AP.theme) || THEMES[0];
 const fxOn = id => AP.fx[id] !== false && !matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+// Character frames of the CLI theme: a 3x3 cell SVG (corners, edges) used
+// as border-image, drawn in the current colors.
+const FRAMES = { ascii: "+-+||+-+", line: "┌─┐││└─┘", double: "╔═╗║║╚═╝" };
+const FRAME_CW = 8, FRAME_CH = 14;
+function apColor(cssVar) {
+  const probe = document.createElement("div");
+  probe.style.color = `var(${cssVar})`;
+  document.body.appendChild(probe);
+  const c = getComputedStyle(probe).color;
+  probe.remove();
+  return c;
+}
+function frameUrl(cells, color) {
+  const text = cells.map(([c, r, ch]) => `<text x='${c * FRAME_CW + FRAME_CW / 2}' y='${r * FRAME_CH + FRAME_CH / 2}'>${ch}</text>`).join("");
+  const w = Math.max(...cells.map(x => x[0])) + 1, h = Math.max(...cells.map(x => x[1])) + 1;
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${w * FRAME_CW}' height='${h * FRAME_CH}'><g font-family='Cascadia Mono, Consolas, monospace' font-size='13' fill='${color}' text-anchor='middle' dominant-baseline='central'>${text}</g></svg>`;
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+}
+function cliFrames() {
+  const g = [...(FRAMES[AP.fx.frame] || FRAMES.ascii)];
+  const box = color => frameUrl([[0, 0, g[0]], [1, 0, g[1]], [2, 0, g[2]], [0, 1, g[3]], [2, 1, g[4]], [0, 2, g[5]], [1, 2, g[6]], [2, 2, g[7]]], color);
+  const frame = apColor("--frame");
+  return { "--cli-frame": box(frame), "--cli-frame-hi": box(apColor("--accent")),
+    "--cli-hline": frameUrl([[0, 0, g[1]]], frame), "--cli-vline": frameUrl([[0, 0, g[3]]], frame) };
+}
 function apValueCss(kind, v) {
   if (kind === "length") return Math.max(0, +v || 0) + "px";
   if (kind === "font") return (FONTS.find(f => f.id === v) || FONTS[0]).css;
@@ -825,6 +907,7 @@ function apApply() {
   root.dataset.theme = apTheme().id;
   root.dataset.mode = apEffectiveMode();
   root.style.cssText = Object.entries(props).map(([k, v]) => `${k}: ${v}`).join("; ");
+  if (apTheme().id === "cli" && document.body) for (const [k, v] of Object.entries(cliFrames())) root.style.setProperty(k, v);
   // what the server puts into the page on the next start, so the window
   // opens in its theme right away
   const t = apTheme();
@@ -860,39 +943,49 @@ function fxLayers() {
   if ($("#fx-rain")) return;
   document.body.insertAdjacentHTML("afterbegin", `<canvas id="fx-rain" aria-hidden="true"></canvas><div id="fx-scan" aria-hidden="true"></div><div id="fx-noise" aria-hidden="true"></div>`);
 }
-const RAIN_CHARS = "アイウエオカキクケコサシスセソタチツテトナニヌネノ0123456789ABCDEF$#%&*+=<>/\\|{}[]:;ЖФЫЩЭЮ";
+// Plain characters (digits, latin, symbols) on a fixed grid: every glyph
+// gets its own cell, so nothing is printed over anything else.
+const RAIN_CHARS = "0123456789ABCDEF<>/\\|+-=*#$%&{}[]:;";
 function rainStart() {
   fxLayers();
   document.documentElement.classList.add("fx-rain");
   if (FX.rain) return;
-  const cv = $("#fx-rain"), ctx = cv.getContext("2d"), size = 15;
-  let cols = [], w = 0, h = 0, last = 0;
+  const cv = $("#fx-rain"), ctx = cv.getContext("2d"), size = 16;
+  let cols = [], rows = 0, w = 0, h = 0, last = 0;
+  const pick = () => RAIN_CHARS[(Math.random() * RAIN_CHARS.length) | 0];
+  const drop = first => ({ row: first ? Math.floor((Math.random() * 1.3 - .3) * rows) : -Math.floor(Math.random() * 24), every: 1 + ((Math.random() * 3) | 0), tick: 0, ch: null });
   const resize = () => {
     const dpr = Math.min(2, devicePixelRatio || 1);
-    w = innerWidth; h = innerHeight;
+    w = innerWidth; h = innerHeight; rows = Math.ceil(h / size);
     cv.width = w * dpr; cv.height = h * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const n = Math.ceil(w / size);
-    cols = Array.from({ length: n }, (_, i) => cols[i] || { y: (Math.random() * 1.3 - .3) * h / size, v: .4 + Math.random() * .9 }); // y in rows
+    cols = Array.from({ length: Math.ceil(w / size) }, (_, i) => cols[i] || drop(true));
     ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--bg"); ctx.fillRect(0, 0, w, h);
   };
   resize();
   const frame = t => {
     FX.rain.raf = requestAnimationFrame(frame);
-    if (document.hidden || t - last < (document.hasFocus() ? 55 : 160)) return; // ~18 fps, slower in the background
+    if (document.hidden || t - last < (document.hasFocus() ? 60 : 180)) return; // ~16 fps, slower in the background
     last = t;
     const cs = getComputedStyle(document.documentElement);
     const bg = cs.getPropertyValue("--bg").trim(), accent = cs.getPropertyValue("--accent").trim(), text = cs.getPropertyValue("--text").trim();
-    ctx.globalAlpha = .14; ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h); ctx.globalAlpha = 1;
-    ctx.font = `${size - 2}px ${cs.getPropertyValue("--mono")}`;
+    ctx.globalAlpha = .09; ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h); // trails fade out
+    ctx.font = `${size - 3}px ${cs.getPropertyValue("--mono")}`;
+    ctx.textBaseline = "middle"; ctx.textAlign = "center";
+    const cell = (x, row, ch, color, alpha) => {
+      ctx.globalAlpha = 1; ctx.fillStyle = bg; ctx.fillRect(x, row * size, size, size);
+      ctx.globalAlpha = alpha; ctx.fillStyle = color; ctx.fillText(ch, x + size / 2, row * size + size / 2);
+    };
     cols.forEach((c, i) => {
-      const ch = RAIN_CHARS[(Math.random() * RAIN_CHARS.length) | 0];
-      const x = i * size, y = c.y * size;
-      ctx.fillStyle = text; ctx.globalAlpha = .9; ctx.fillText(ch, x, y);
-      ctx.fillStyle = accent; ctx.globalAlpha = .55; ctx.fillText(RAIN_CHARS[(Math.random() * RAIN_CHARS.length) | 0], x, y - size);
-      ctx.globalAlpha = 1;
-      c.y += c.v;
-      if (y > h + size * 4 && Math.random() > .975) { c.y = Math.random() * -20; c.v = .4 + Math.random() * .9; }
+      if (++c.tick < c.every) return;
+      c.tick = 0;
+      const x = i * size;
+      if (c.ch && c.row > 0) cell(x, c.row - 1, c.ch, accent, .75); // the old head becomes trail
+      c.ch = pick();
+      if (c.row >= 0) cell(x, c.row, c.ch, text, .95);
+      c.row++;
+      if (c.row > rows + 2 && Math.random() > .96) Object.assign(c, drop(false));
     });
+    ctx.globalAlpha = 1;
   };
   FX.rain = { raf: requestAnimationFrame(frame), resize };
   addEventListener("resize", resize);
@@ -1005,7 +1098,9 @@ function renderAppearance() {
     <div class="panel"><h3>Режим</h3>
       <div class="seg" id="ap-mode">${[["system", "Как в Windows"], ["light", "Светлая"], ["dark", "Тёмная"]].map(([m, l]) => `<button data-m="${m}" class="${AP.mode === m ? "on" : ""}" ${t.modes.length === 1 ? "disabled" : ""}>${l}</button>`).join("")}</div>
       ${t.modes.length === 1 ? `<p class="help" style="color:var(--muted);font-size:12.5px;margin:8px 0 0">У темы «${esc(t.name)}» только ${t.modes[0] === "dark" ? "тёмный" : "светлый"} вариант.</p>` : ""}
-      ${t.fx.length ? `<div class="fx-list"><div class="ap-sub">Эффекты темы</div>${t.fx.map(f => `<label class="check"><input type="checkbox" class="switch" data-fx="${f.id}" ${AP.fx[f.id] !== false ? "checked" : ""}><span><b style="font-size:13px">${esc(f.label)}</b><br><span style="color:var(--muted);font-size:12.5px">${esc(f.help)}</span></span></label>`).join("")}
+      ${t.fx.length ? `<div class="fx-list"><div class="ap-sub">Эффекты темы</div>${t.fx.map(f => f.choices
+        ? `<div class="field" style="margin:0 0 6px"><span>${esc(f.label)}</span><select data-fxsel="${f.id}" style="max-width:260px;font-family:var(--mono)">${f.choices.map(([v, l]) => `<option value="${v}" ${(AP.fx[f.id] || f.choices[0][0]) === v ? "selected" : ""}>${esc(l)}</option>`).join("")}</select><span class="help">${esc(f.help)}</span></div>`
+        : `<label class="check"><input type="checkbox" class="switch" data-fx="${f.id}" ${AP.fx[f.id] !== false ? "checked" : ""}><span><b style="font-size:13px">${esc(f.label)}</b><br><span style="color:var(--muted);font-size:12.5px">${esc(f.help)}</span></span></label>`).join("")}
         ${matchMedia("(prefers-reduced-motion: reduce)").matches ? `<p class="help" style="color:var(--warn);font-size:12.5px;margin:4px 0 0">В Windows включено «Уменьшение анимации» — эффекты не показываются.</p>` : ""}</div>` : ""}
     </div>
     <div class="panel"><h3>Основные</h3><div class="ap-rows">${general.map(apRow).join("")}</div></div>
@@ -1036,6 +1131,7 @@ function apWire() {
   view.querySelectorAll("[data-th]").forEach(b => b.onclick = () => { AP.theme = b.dataset.th; typedTab = null; apSave(); renderAppearance(); });
   view.querySelectorAll("#ap-mode [data-m]").forEach(b => b.onclick = () => { AP.mode = b.dataset.m; apSave(); renderAppearance(); });
   view.querySelectorAll("[data-fx]").forEach(el => el.onchange = () => { AP.fx[el.dataset.fx] = el.checked; apSave(); });
+  view.querySelectorAll("[data-fxsel]").forEach(el => el.onchange = () => { AP.fx[el.dataset.fxsel] = el.value; apSave(); });
   view.querySelectorAll(".ap-row[data-p]").forEach(row => {
     const p = apParam(row.dataset.p);
     const set = c => { if (c) AP.values[p.id] = c; else delete AP.values[p.id]; apSave(); };

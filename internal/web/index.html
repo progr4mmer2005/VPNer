@@ -309,7 +309,7 @@ const RUNTIME = { native: ["native", "Встроенный"], wsl: ["wsl", "Ко
 const STATES = {
   ready: ["ok", "Готово"], up: ["ok", "Подключено"], starting: ["warn", "Подключается…"], auth: ["warn", "Нужен ввод"],
   down: ["bad", "Нет связи"], failed: ["bad", "Ошибка"], off: ["muted", "Отключено"], stopped: ["muted", "Отключено"], disabled: ["muted", "Выключено"],
-  provisioning: ["warn", "Создаётся…"], novpn: ["warn", "VPN в ВМ не подключён"], confirm: ["warn", "Ожидает подтверждения"]
+  provisioning: ["warn", "Создаётся…"], novpn: ["warn", "VPN в ВМ не подключён"], confirm: ["warn", "Ожидает подтверждения"], queued: ["warn", "В очереди"]
 };
 // Ready-made rule sets: sites (with subdomains) and desktop apps.
 const RULE_PRESETS = [
@@ -435,10 +435,11 @@ function renderHeader() {
   const st = S.state; if (!st) return;
   const conns = st.connections || [];
   const active = conns.filter(c => c.state === "up" || c.state === "ready").length;
-  const problems = conns.filter(c => ["down", "failed", "auth", "confirm"].includes(c.state)).length;
+  const problems = conns.filter(c => ["down", "failed"].includes(c.state)).length;
+  const waiting = conns.filter(c => ["auth", "confirm", "queued"].includes(c.state)).length;
   let dot = "dot", title, sub;
   if (st.starting) { dot += " warn"; title = "Запуск…"; sub = st.setup ? st.setup.stage : ""; }
-  else if (st.running) { dot += problems ? " warn" : " ok"; title = "Маршрутизация включена"; sub = `активно: ${active} из ${conns.filter(c=>c.enabled).length}` + (problems ? ` · проблемы: ${problems}` : "") + (st.killSwitch ? " · kill-switch включён" : ""); }
+  else if (st.running) { dot += problems || waiting ? " warn" : " ok"; title = "Маршрутизация включена"; sub = `активно: ${active} из ${conns.filter(c=>c.enabled).length}` + (waiting ? ` · ждут входа: ${waiting}` : "") + (problems ? ` · проблемы: ${problems}` : "") + (st.killSwitch ? " · kill-switch включён" : ""); }
   else { title = "Маршрутизация выключена"; sub = "весь трафик идёт как обычно"; }
   $("#st-dot").className = dot; $("#st-title").textContent = title; $("#st-sub").textContent = sub;
   const pw = $("#power");
@@ -472,7 +473,7 @@ let quitShown = false;
 function showQuitConfirm() {
   if (quitShown) return;
   quitShown = true;
-  const active = ((S.state && S.state.connections) || []).filter(c => ["up", "ready", "starting", "auth", "confirm", "provisioning", "novpn"].includes(c.state));
+  const active = ((S.state && S.state.connections) || []).filter(c => ["up", "ready", "starting", "auth", "confirm", "queued", "provisioning", "novpn"].includes(c.state));
   const list = active.map(c => `<li>${esc(c.name)}</li>`).join("");
   const m = modal(`<header><h3>Выйти из VPNer?</h3></header>
     <div class="body"><p style="margin-top:0">Сейчас работают VPN-подключения${active.length ? ":" : "."}</p>${list ? `<ul style="margin:0 0 12px;padding-left:20px">${list}</ul>` : ""}
@@ -516,7 +517,7 @@ function renderConns() {
       const [rcls, rtitle] = RUNTIME[v.runtime] || ["", v.runtime || ""];
       const [scls, stitle] = STATES[v.state] || ["muted", v.state || ""];
       const isRuntime = v.runtime && v.runtime !== "native";
-      const running = ["up", "starting", "auth", "confirm", "down", "provisioning", "novpn"].includes(v.state);
+      const running = ["up", "starting", "auth", "confirm", "queued", "down", "provisioning", "novpn"].includes(v.state);
       let kv = "";
       if (v.ip) kv += `<span>Адрес в VPN</span><span class="mono">${esc(v.ip)}</span>`;
       if (v.dns && v.dns.length) kv += `<span>DNS туннеля</span><span class="mono">${esc(v.dns.join(", "))}</span>`;
@@ -530,7 +531,7 @@ function renderConns() {
         ${v.state === "starting" && v.since && Date.now() / 1000 - v.since > 8 ? `<div class="detail" style="color:var(--warn)">Подключается дольше обычного — возможно, вход ожидает дополнительного подтверждения.</div>` : ""}
         ${kv ? `<div class="kv">${kv}</div>` : ""}
         <div class="actions">
-          ${isRuntime && c.enabled ? (running ? `<button class="btn small" onclick="connAction('${c.id}','disconnect')">Отключить</button>` : `<button class="btn small primary" onclick="connAction('${c.id}','connect')">Подключить</button>`) : ""}
+          ${isRuntime && c.enabled ? (running ? `<button class="btn small" onclick="connAction('${c.id}','disconnect')">${v.state === "queued" ? "Отменить" : "Отключить"}</button>` : `<button class="btn small primary" onclick="connAction('${c.id}','connect')">Подключить</button>`) : ""}
           ${v.runtime === "vm" ? `<button class="btn small" onclick="connAction('${c.id}','console')">Окно ВМ</button>` : ""}
           ${v.runtime === "vm" && running ? `<label class="btn small" title="Установщик VPN-программы, конфиг, сертификат — появится в папке «Файлы из VPNer» на рабочем столе ВМ">Передать файл<input type="file" hidden onchange="vmUpload('${c.id}', this)"></label>` : ""}
           ${v.prompt ? `<button class="btn small primary" onclick="showPrompt(connView('${c.id}'), true)">Ввести</button>` : ""}

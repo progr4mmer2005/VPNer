@@ -453,28 +453,57 @@ func (a *App) Start() error {
 		return err
 	}
 	a.Log.Infof("app", "маршрутизация включена")
-	// Autostart connections one after another: corporate VPNs often confirm
-	// logins through the same push service, and two simultaneous requests
-	// make one of them fail.
 	var ids []string
 	for _, c := range a.Config().Connections {
 		if c.Enabled && c.Autostart && needsRuntime(c.Type) {
 			ids = append(ids, c.ID)
 		}
 	}
+	// One after another: corporate VPNs often confirm logins through the
+	// same push service, and two simultaneous requests make one of them
+	// fail. The waiting ones are shown as queued, so it is clear they will
+	// connect by themselves.
+	for _, id := range ids {
+		a.setConn(id, func(rt *connRuntime) {
+			rt.Want = true
+			rt.State, rt.Detail, rt.Prompt = "queued", "подключится сам, по очереди", nil
+			rt.Since = time.Now().Unix()
+		})
+	}
 	go func() {
-		for _, id := range ids {
+		for k, id := range ids {
 			if !a.Running() {
 				return
 			}
-			if err := a.Connect(id); err != nil {
-				a.Log.Errorf(id, "автоподключение: %v", err)
-				continue
+			if !a.isQueued(id) {
+				continue // the user connected or cancelled it meanwhile
+			}
+			a.autoConnect(id)
+			wait := fmt.Sprintf("подключится сам, когда завершится вход в «%s»", a.ConnName(id))
+			for _, next := range ids[k+1:] {
+				a.setConn(next, func(rt *connRuntime) {
+					if rt.State == "queued" {
+						rt.Detail = wait
+					}
+				})
 			}
 			a.waitLogin(id, 3*time.Minute)
 		}
 	}()
 	return nil
+}
+
+func (a *App) autoConnect(id string) {
+	if err := a.Connect(id); err != nil {
+		a.Log.Errorf(id, "автоподключение: %v", err)
+	}
+}
+
+func (a *App) isQueued(id string) bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	rt := a.conns[id]
+	return rt != nil && rt.State == "queued" && rt.Want
 }
 
 // waitLogin waits while a connection is still logging in (starting, asking

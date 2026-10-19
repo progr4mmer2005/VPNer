@@ -392,6 +392,42 @@ input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px va
 :root[data-theme="cli"] input[type=range]::-webkit-slider-runnable-track { height: 14px; border-radius: 0; background: var(--cli-hline) left center / 8px 14px repeat-x; }
 :root[data-theme="cli"] input[type=range]::-webkit-slider-thumb { width: 10px; height: 14px; margin-top: 0; border-radius: 0; border: none; box-shadow: none; background: var(--accent); }
 
+/* ---------- dropdowns: the list itself is drawn by the app (customizable
+   select), so it follows the theme instead of the system menu ---------- */
+@supports (appearance: base-select) {
+  select, ::picker(select) { appearance: base-select; }
+  select { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; min-height: 32px; text-align: left; white-space: nowrap; overflow: hidden; }
+  select > button, select selectedcontent { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  select::picker-icon { content: ""; width: 10px; height: 10px; flex: none; margin-left: auto; background: var(--muted); mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M1.5 3.5 5 7l3.5-3.5' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat; transition: rotate .15s; }
+  select:open::picker-icon { rotate: 180deg; }
+  select:hover:not(:disabled) { border-color: color-mix(in srgb, var(--line) 40%, var(--muted)); }
+  select:disabled { opacity: .55; cursor: default; }
+  ::picker(select) { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-btn); padding: 4px; margin: 4px 0;
+    box-shadow: 0 12px 34px rgba(0,0,0,.28); max-height: min(60vh, 380px); overflow: auto; min-width: anchor-size(width); }
+  select option { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: max(0px, calc(var(--r-btn) - 2px)); cursor: pointer; white-space: nowrap; }
+  select option:hover, select option:focus-visible { background: var(--panel2); outline: none; }
+  select option:checked { background: var(--accent-weak); color: var(--accent); font-weight: 600; }
+  select option::checkmark { content: "✓"; order: 1; margin-left: auto; padding-left: 12px; color: var(--accent); }
+  select option:disabled { opacity: .5; cursor: default; }
+  select optgroup { padding: 2px 0; }
+  select optgroup::label, select optgroup > legend { display: block; padding: 6px 10px 2px; font-size: 11.5px; font-weight: 600; color: var(--muted); }
+  :root[data-theme="glass"] ::picker(select) { background: var(--glass-strong); backdrop-filter: blur(28px) saturate(1.6); border-color: var(--glass-line); box-shadow: 0 16px 40px rgba(0,0,0,.25); }
+  :root[data-theme="glass"] select option:checked { background: color-mix(in srgb, var(--text) 8%, transparent); color: var(--text); }
+  :root[data-theme="glass"] select option:checked::before { content: ""; width: 3px; height: 14px; border-radius: 3px; background: var(--accent); margin-left: -6px; }
+  :root[data-theme="cli"] ::picker(select) { border-style: solid; border-color: transparent; border-width: 14px 8px; border-image: var(--cli-frame-hi) 14 8 / 14px 8px round;
+    background-clip: padding-box; padding: 0 2px; box-shadow: 0 0 30px color-mix(in srgb, var(--accent) 18%, transparent); }
+  :root[data-theme="cli"] select::picker-icon { mask: none; background: none; width: auto; height: auto; content: "▾"; color: var(--accent); }
+  :root[data-theme="cli"] select option { border-radius: 0; padding: 3px 8px; }
+  :root[data-theme="cli"] select option::before { content: "\00a0\00a0"; color: var(--accent); }
+  :root[data-theme="cli"] select option:checked { background: transparent; }
+  :root[data-theme="cli"] select option:checked::before { content: "▸\00a0"; }
+  :root[data-theme="cli"] select option:hover, :root[data-theme="cli"] select option:focus-visible { background: var(--accent); color: var(--on-accent); }
+  :root[data-theme="cli"] select option:hover::before, :root[data-theme="cli"] select option:focus-visible::before { color: var(--on-accent); }
+  :root[data-theme="cli"] select option::checkmark { content: none; }
+  :root[data-theme="cli"] select optgroup::label, :root[data-theme="cli"] select optgroup > legend { padding: 4px 8px 0; }
+  :root[data-theme="cli"] select optgroup::label::before { content: "## "; }
+}
+
 /* ---------- effects layers ---------- */
 #fx-rain, #fx-scan, #fx-flicker, #fx-beam, #fx-noise { position: fixed; inset: 0; pointer-events: none; display: none; }
 #fx-rain { z-index: 0; width: 100%; height: 100%; opacity: .55; }
@@ -521,6 +557,7 @@ input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px va
 :root[data-theme="cli"] .swatch, :root[data-theme="cli"] button.picker { border-style: dashed; }
 /* effects on paper: darker lines, inverted noise */
 :root[data-theme="cli"][data-mode="light"] #fx-rain { opacity: .3; }
+:root[data-theme="cli"][data-mode="light"] #fx-flicker { background: rgba(60,50,30,.05); }
 :root[data-theme="cli"][data-mode="light"] #fx-scan { background: repeating-linear-gradient(to bottom, transparent 0 2px, rgba(60,50,30,.06) 2px 3px), radial-gradient(130% 100% at 50% 50%, transparent 65%, rgba(60,50,30,.14) 100%); }
 :root[data-theme="cli"][data-mode="light"] #fx-noise { mix-blend-mode: multiply; filter: invert(1); }
 :root[data-theme="cli"][data-mode="light"].fx-glitch h2, :root[data-theme="cli"][data-mode="light"].fx-glitch .brand, :root[data-theme="cli"][data-mode="light"].fx-glitch .status .big, :root[data-theme="cli"][data-mode="light"].fx-glitch .card .name { text-shadow: 2px 0 rgba(220,0,70,.55), -2px 0 rgba(0,150,200,.55); }
@@ -557,7 +594,6 @@ input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px va
 @keyframes glass-drift { 0% { transform: translate(0, 0) rotate(0deg) scale(1); } 50% { transform: translate(6%, -4%) rotate(18deg) scale(1.08); } 100% { transform: translate(-5%, 5%) rotate(-12deg) scale(.96); } }
 :root[data-theme="glass"] nav, :root[data-theme="glass"] .card, :root[data-theme="glass"] .panel, :root[data-theme="glass"] .rule, :root[data-theme="glass"] .dns-srv,
 :root[data-theme="glass"] table, :root[data-theme="glass"] .logs, :root[data-theme="glass"] .type, :root[data-theme="glass"] .theme-card, :root[data-theme="glass"] .empty,
-:root[data-theme="cli"][data-mode="light"] #fx-flicker { background: rgba(60,50,30,.05); }
 :root[data-theme="glass"] .ctx-menu, :root[data-theme="glass"] .modal, :root[data-theme="glass"] .toast {
   background: var(--glass); backdrop-filter: blur(28px) saturate(1.6); -webkit-backdrop-filter: blur(28px) saturate(1.6); border-color: var(--glass-line); }
 :root[data-theme="glass"] nav { background: var(--glass-strong); border-right: 1px solid var(--glass-line); }
@@ -986,9 +1022,14 @@ const FX = { rain: null, glitch: null };
 function fxUpdate() {
   const root = document.documentElement, t = apTheme().id;
   const on = id => apTheme().fx.some(f => f.id === id) && fxOn(id);
+  root.classList.toggle("no-anim", AP.anim === false);
   root.classList.toggle("fx-scan", t === "cli" && on("scan"));
+  root.classList.toggle("fx-flicker", t === "cli" && on("flicker"));
+  root.classList.toggle("fx-beam", t === "cli" && on("beam"));
+  root.classList.toggle("fx-cursor", t === "cli" && on("cursor"));
   root.classList.toggle("fx-glitchable", t === "cli" && on("glitch"));
   root.classList.toggle("fx-blobs", t === "glass" && on("blobs"));
+  if (t === "cli" && ["scan", "flicker", "beam"].some(on)) fxLayers();
   if (t === "cli" && on("rain")) rainStart(); else rainStop();
   if (t === "cli" && on("glitch")) glitchStart(); else glitchStop();
 }
@@ -1022,14 +1063,9 @@ function rainStart() {
     const cs = getComputedStyle(document.documentElement);
     const bg = cs.getPropertyValue("--bg").trim(), accent = cs.getPropertyValue("--accent").trim(), text = cs.getPropertyValue("--text").trim();
     ctx.globalAlpha = .09; ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h); // trails fade out
-  root.classList.toggle("no-anim", AP.anim === false);
     ctx.font = `${size - 3}px ${cs.getPropertyValue("--mono")}`;
-  root.classList.toggle("fx-flicker", t === "cli" && on("flicker"));
-  root.classList.toggle("fx-beam", t === "cli" && on("beam"));
-  root.classList.toggle("fx-cursor", t === "cli" && on("cursor"));
     ctx.textBaseline = "middle"; ctx.textAlign = "center";
     const cell = (x, row, ch, color, alpha) => {
-  if (t === "cli" && ["scan", "flicker", "beam"].some(on)) fxLayers();
       ctx.globalAlpha = 1; ctx.fillStyle = bg; ctx.fillRect(x, row * size, size, size);
       ctx.globalAlpha = alpha; ctx.fillStyle = color; ctx.fillText(ch, x + size / 2, row * size + size / 2);
     };
@@ -1340,6 +1376,11 @@ function apWire() {
   view.querySelectorAll("#ap-mode [data-m]").forEach(b => b.onclick = () => { AP.mode = b.dataset.m; apSave(); renderAppearance(); });
   view.querySelectorAll("[data-fx]").forEach(el => el.onchange = () => { AP.fx[el.dataset.fx] = el.checked; apSave(); });
   view.querySelectorAll("[data-fxsel]").forEach(el => el.onchange = () => { AP.fx[el.dataset.fxsel] = el.value; apSave(); });
+  $("#ap-anim").onchange = e => { AP.anim = e.target.checked; apSave(); renderAppearance(); };
+  view.querySelectorAll("[data-fx-all]").forEach(b => b.onclick = () => {
+    for (const f of apTheme().fx) if (!f.choices) AP.fx[f.id] = b.dataset.fxAll === "1";
+    apSave(); renderAppearance();
+  });
   view.querySelectorAll(".ap-row[data-p]").forEach(row => {
     const p = apParam(row.dataset.p);
     const set = c => { if (c) AP.values[p.id] = c; else delete AP.values[p.id]; apSave(); };
@@ -1376,11 +1417,6 @@ function apWire() {
   $("#ap-reset-all").onclick = async () => {
     if (!await ask("Тема, режим, все свои значения и переменные вернутся к стандартным.", { title: "Сбросить оформление?", ok: "Сбросить", danger: true })) return;
     AP = AP_DEFAULT(); apSave(); renderAppearance();
-  $("#ap-anim").onchange = e => { AP.anim = e.target.checked; apSave(); renderAppearance(); };
-  view.querySelectorAll("[data-fx-all]").forEach(b => b.onclick = () => {
-    for (const f of apTheme().fx) if (!f.choices) AP.fx[f.id] = b.dataset.fxAll === "1";
-    apSave(); renderAppearance();
-  });
   };
 }
 // apBindEditor wires a value editor (color picker + hex, range, font list).

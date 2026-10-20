@@ -137,7 +137,7 @@ func main() {
 
 	tok := make([]byte, 24)
 	rand.Read(tok)
-	srv := &web.Server{App: a, Token: hex.EncodeToString(tok)}
+	srv := &web.Server{App: a, Token: hex.EncodeToString(tok), Version: version}
 	if err := srv.Start(cfg.Settings.UIPort); err != nil {
 		fatal(fmt.Sprintf(i18n.T("main.couldNotStartInterface"), err))
 	}

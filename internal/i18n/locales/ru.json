@@ -750,7 +750,7 @@
  "ui.servers": "Серверы",
  "ui.setAddedClickSaveRules": "Набор добавлен — нажмите «Сохранить правила»",
  "ui.settings": "Настройки",
- "ui.settings.dataDir": "Данные программы: %s · движок mihomo %s",
+ "ui.settings.dataDir": "VPNer %s · данные программы: %s · движок mihomo %s",
  "ui.settings.dnsTab": "Серверы (DoH, DoT, DoQ…), правила для доменов и режим — на вкладке %s.",
  "ui.settings.done": "Готово: %s",
  "ui.settings.language": "Язык",

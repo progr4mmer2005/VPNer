@@ -2386,7 +2386,7 @@ async function renderSettings() {
     <div class="panel"><h3>${tr("ui.virtualMachinesHyperV")}</h3><div id="hv-st" class="help" style="color:var(--muted)">${tr("ui.checking")}</div></div>
     <div class="panel"><h3>${tr("ui.maintenance")}</h3>
       <div class="row"><button class="btn danger" onclick="restoreNet()">${tr("ui.restoreNetworkEmergency")}</button><span class="help" style="color:var(--muted);font-size:12.5px">${tr("ui.turnsRoutingOffAndRemoves")}</span></div>
-      <p class="help" style="color:var(--muted);font-size:12.5px;margin-bottom:0">${tr("ui.settings.dataDir", `<span class="mono">${esc(S.cfg.dataDir)}</span>`, esc(S.info.mihomo || ""))}</p>
+      <p class="help" style="color:var(--muted);font-size:12.5px;margin-bottom:0">${tr("ui.settings.dataDir", esc(S.info.version || ""), `<span class="mono">${esc(S.cfg.dataDir)}</span>`, esc(S.info.mihomo || ""))}</p>
     </div>`;
   const save = async () => {
     const ns = { ...S.cfg.settings };

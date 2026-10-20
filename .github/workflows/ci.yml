@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache the Go toolchain
+        uses: actions/cache@v4
+        with:
+          path: .tools
+          key: tools-${{ hashFiles('build.ps1') }}
+
+      - name: Build
+        shell: pwsh
+        run: ./build.ps1
+
+      - name: Vet and test
+        shell: pwsh
+        run: |
+          $go = '.tools\go\bin\go.exe'
+          & $go vet ./...
+          if ($LASTEXITCODE) { exit 1 }
+          & $go test ./...
+          if ($LASTEXITCODE) { exit 1 }
+          $env:GOOS = 'linux'
+          & $go vet ./internal/agent ./cmd/vpner-agent
+          if ($LASTEXITCODE) { exit 1 }

@@ -1,0 +1,55 @@
+name: Bug report / Ошибка
+description: Something does not work as it should / Что-то работает не так
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing VPNer! Please do not paste keys, passwords or configs with secrets.
+        Спасибо, что тестируете VPNer! Не вставляйте ключи, пароли и конфиги с секретами.
+        A leak or another security problem? Write to the email in SECURITY.md instead. / Утечка или другая проблема безопасности? Напишите на почту из SECURITY.md.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened / Что случилось
+      description: What you did, what you expected and what happened instead. / Что делали, что ожидали и что произошло.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce / Как повторить
+      placeholder: |
+        1. ...
+        2. ...
+  - type: input
+    id: version
+    attributes:
+      label: VPNer version / Версия VPNer
+      description: Settings → Maintenance, or `vpner.exe version` / Настройки → Обслуживание или `vpner.exe version`
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version / Версия Windows
+      placeholder: Windows 11 Pro 24H2
+  - type: dropdown
+    id: types
+    attributes:
+      label: Connection types / Типы подключений
+      multiple: true
+      options:
+        - WireGuard / AmneziaWG
+        - Amnezia full access key / ключ полного доступа
+        - VLESS / VMess / Trojan / Shadowsocks / Hysteria2 / TUIC
+        - Cisco / OpenConnect
+        - OpenVPN
+        - Hyper-V virtual machine / виртуалка
+        - Other / другое
+  - type: textarea
+    id: log
+    attributes:
+      label: Log / Журнал
+      description: The relevant lines from the Log tab (check them for addresses you do not want to share). / Нужные строки со вкладки «Журнал» (проверьте, нет ли там адресов, которыми не хотите делиться).
+      render: text

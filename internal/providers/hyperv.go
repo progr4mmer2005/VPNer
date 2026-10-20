@@ -1,6 +1,8 @@
 package providers
 
 import (
+	"vpner/internal/i18n"
+
 	"strconv"
 
 	"vpner/internal/config"
@@ -13,18 +15,18 @@ type hypervProvider struct{}
 func init() { Register(hypervProvider{}) }
 
 func (hypervProvider) Type() string     { return "hyperv" }
-func (hypervProvider) Title() string    { return "Виртуалка для VPN-программы" }
+func (hypervProvider) Title() string    { return i18n.T("providers.virtualMachineForVpnProgram") }
 func (hypervProvider) Runtime() Runtime { return RuntimeVM }
 func (hypervProvider) Description() string {
-	return "Отдельная виртуальная машина Hyper-V с Linux и рабочим столом — для оригинальных программ (AmneziaVPN, Cisco Secure Client, клиенты провайдеров). VPNer сам скачает систему, создаст и настроит ВМ; вы ставите туда VPN-программу и подключаетесь. Трафик шлюза в ВМ может идти только через туннель этой программы."
+	return i18n.T("providers.separateHyperVVirtualMachine")
 }
 
 func (hypervProvider) Fields() []Field {
 	return []Field{
-		{Key: "memory", Label: "Память ВМ, МБ", Kind: "number", Default: "3072", Help: "2048 — минимум для рабочего стола, 4096 — комфортно."},
-		{Key: "cpus", Label: "Процессоров", Kind: "number", Default: "2"},
-		{Key: "desktop", Label: "Рабочий стол и браузер", Kind: "bool", Default: "true", Help: "Нужен для графических VPN-программ и входа через браузер. Без него ВМ легче, но программа должна работать из консоли."},
-		{Key: "disk", Label: "Размер диска, ГБ", Kind: "number", Default: "24", Advanced: true},
+		{Key: "memory", Label: i18n.T("providers.vmMemoryMb"), Kind: "number", Default: "3072", Help: i18n.T("providers.2048IsMinimumForDesktop")},
+		{Key: "cpus", Label: i18n.T("providers.processors"), Kind: "number", Default: "2"},
+		{Key: "desktop", Label: i18n.T("providers.desktopAndBrowser"), Kind: "bool", Default: "true", Help: i18n.T("providers.neededForGraphicalVpnPrograms")},
+		{Key: "disk", Label: i18n.T("providers.diskSizeGb"), Kind: "number", Default: "24", Advanced: true},
 		fieldFallbackDNS(),
 	}
 }

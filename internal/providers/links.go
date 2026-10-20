@@ -1,6 +1,8 @@
 package providers
 
 import (
+	"vpner/internal/i18n"
+
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -23,14 +25,14 @@ func init() { Register(linkProvider{}) }
 
 func (linkProvider) Type() string { return "link" }
 func (linkProvider) Title() string {
-	return "Ссылка (VLESS/Reality, VMess, Trojan, Shadowsocks, Hysteria2, TUIC)"
+	return i18n.T("providers.linkVlessRealityVmessTrojan")
 }
 func (linkProvider) Runtime() Runtime { return RuntimeNative }
 func (linkProvider) Description() string {
-	return "Ссылка-ключ вида vless://, vmess://, trojan://, ss://, hysteria2://, tuic://, socks5://, http://. Работает прямо в движке."
+	return i18n.T("providers.keyLinkLikeVlessVmess")
 }
 func (linkProvider) Fields() []Field {
-	return []Field{{Key: "link", Label: "Ссылка", Kind: "textarea", Secret: true, Required: true, Placeholder: "vless://uuid@host:443?security=reality&pbk=...&sni=...#name"}}
+	return []Field{{Key: "link", Label: i18n.T("providers.link"), Kind: "textarea", Secret: true, Required: true, Placeholder: "vless://uuid@host:443?security=reality&pbk=...&sni=...#name"}}
 }
 
 var linkSchemes = []string{"vless://", "vmess://", "trojan://", "ss://", "hysteria2://", "hy2://", "tuic://", "socks5://", "socks://", "http://", "https://"}
@@ -80,7 +82,7 @@ func b64any(s string) ([]byte, error) {
 			return b, nil
 		}
 	}
-	return nil, errors.New("неверный base64")
+	return nil, errors.New(i18n.T("providers.invalidBase64"))
 }
 
 func portOf(u *url.URL, def int) (int, error) {
@@ -167,13 +169,13 @@ func parseLink(link string) (map[string]any, string, error) {
 	}
 	u, err := url.Parse(link)
 	if err != nil {
-		return nil, "", fmt.Errorf("ссылка: %v", err)
+		return nil, "", fmt.Errorf(i18n.T("providers.link2"), err)
 	}
 	name := u.Fragment
 	q := u.Query()
 	host := u.Hostname()
 	if host == "" && u.Scheme != "ss" {
-		return nil, "", errors.New("в ссылке нет адреса сервера")
+		return nil, "", errors.New(i18n.T("providers.linkHasNoServerAddress"))
 	}
 	m := map[string]any{"server": host, "udp": true}
 	switch strings.ToLower(u.Scheme) {
@@ -296,7 +298,7 @@ func parseLink(link string) (map[string]any, string, error) {
 			m["password"] = p
 		}
 	default:
-		return nil, "", fmt.Errorf("неподдерживаемая схема %q", u.Scheme)
+		return nil, "", fmt.Errorf(i18n.T("providers.unsupportedScheme"), u.Scheme)
 	}
 	return m, name, nil
 }
@@ -313,24 +315,24 @@ func parseSS(u *url.URL) (map[string]any, string, error) {
 		} else if b, err := b64any(user); err == nil {
 			method, password, _ = strings.Cut(string(b), ":")
 		} else {
-			return nil, "", errors.New("ss://: не удалось разобрать метод/пароль")
+			return nil, "", errors.New(i18n.T("providers.ssCouldNotParseMethod"))
 		}
 		host = u.Hostname()
 		p, err := strconv.Atoi(u.Port())
 		if err != nil {
-			return nil, "", errors.New("ss://: нет порта")
+			return nil, "", errors.New(i18n.T("providers.ssNoPort"))
 		}
 		port = p
 	} else {
 		// legacy: ss://base64(method:password@host:port)
 		b, err := b64any(u.Host + u.Path)
 		if err != nil {
-			return nil, "", errors.New("ss://: неверный base64")
+			return nil, "", errors.New(i18n.T("providers.ssInvalidBase64"))
 		}
 		s := string(b)
 		at := strings.LastIndex(s, "@")
 		if at < 0 {
-			return nil, "", errors.New("ss://: неверный формат")
+			return nil, "", errors.New(i18n.T("providers.ssInvalidFormat"))
 		}
 		method, password, _ = strings.Cut(s[:at], ":")
 		h, ps, err := net.SplitHostPort(s[at+1:])
@@ -366,7 +368,7 @@ func parseSS(u *url.URL) (map[string]any, string, error) {
 			m["plugin"] = "v2ray-plugin"
 			m["plugin-opts"] = po
 		default:
-			return nil, "", fmt.Errorf("ss://: плагин %q не поддерживается", parts[0])
+			return nil, "", fmt.Errorf(i18n.T("providers.ssPluginIsNotSupported"), parts[0])
 		}
 	}
 	return m, name, nil
@@ -375,11 +377,11 @@ func parseSS(u *url.URL) (map[string]any, string, error) {
 func parseVMess(link string) (map[string]any, string, error) {
 	b, err := b64any(strings.TrimPrefix(strings.TrimPrefix(link, "vmess://"), "VMESS://"))
 	if err != nil {
-		return nil, "", errors.New("vmess://: неверный base64")
+		return nil, "", errors.New(i18n.T("providers.vmessInvalidBase64"))
 	}
 	var v map[string]any
 	if err := json.Unmarshal(b, &v); err != nil {
-		return nil, "", errors.New("vmess://: неверный JSON")
+		return nil, "", errors.New(i18n.T("providers.vmessInvalidJson"))
 	}
 	str := func(k string) string {
 		switch x := v[k].(type) {
@@ -392,7 +394,7 @@ func parseVMess(link string) (map[string]any, string, error) {
 	}
 	port, err := strconv.Atoi(str("port"))
 	if err != nil {
-		return nil, "", errors.New("vmess://: неверный порт")
+		return nil, "", errors.New(i18n.T("providers.vmessInvalidPort"))
 	}
 	aid, _ := strconv.Atoi(str("aid"))
 	m := map[string]any{"type": "vmess", "server": str("add"), "port": port, "uuid": str("id"), "alterId": aid,
@@ -420,13 +422,13 @@ type rawProvider struct{}
 func init() { Register(rawProvider{}) }
 
 func (rawProvider) Type() string     { return "mihomo" }
-func (rawProvider) Title() string    { return "Прокси mihomo (YAML)" }
+func (rawProvider) Title() string    { return i18n.T("providers.mihomoProxyYaml") }
 func (rawProvider) Runtime() Runtime { return RuntimeNative }
 func (rawProvider) Description() string {
-	return "Любой протокол, который понимает mihomo, описанный вручную в YAML (одна запись из раздела proxies). Для продвинутых."
+	return i18n.T("providers.anyProtocolMihomoUnderstandsDescribed")
 }
 func (rawProvider) Fields() []Field {
-	return []Field{{Key: "yaml", Label: "YAML прокси", Kind: "textarea", Secret: true, Required: true,
+	return []Field{{Key: "yaml", Label: i18n.T("providers.proxyYaml"), Kind: "textarea", Secret: true, Required: true,
 		Placeholder: "type: vless\nserver: example.com\nport: 443\nuuid: ...\ntls: true"}}
 }
 
@@ -441,7 +443,7 @@ func (rawProvider) Outbound(c *config.Connection) (map[string]any, error) {
 		}
 	}
 	if _, ok := m["type"]; !ok {
-		return nil, errors.New("в YAML нет поля type")
+		return nil, errors.New(i18n.T("providers.yamlHasNoTypeField"))
 	}
 	delete(m, "name")
 	return m, nil
@@ -466,29 +468,29 @@ func init() { Register(upstreamProvider{}) }
 
 func (upstreamProvider) Type() string { return "upstream" }
 func (upstreamProvider) Title() string {
-	return "Внешний прокси / своя виртуалка"
+	return i18n.T("providers.externalProxyOwnVirtualMachine")
 }
 func (upstreamProvider) Runtime() Runtime { return RuntimeNative }
 func (upstreamProvider) Description() string {
-	return "Уже работающий SOCKS5/HTTP-прокси: например, шлюз в вашей собственной виртуалке с VPN-программой или прокси-порт другой программы."
+	return i18n.T("providers.alreadyRunningSocks5HttpProxy")
 }
 func (upstreamProvider) Fields() []Field {
 	return []Field{
-		{Key: "proto", Label: "Протокол", Kind: "select", Default: "socks5", Options: []Option{{"socks5", "SOCKS5"}, {"http", "HTTP"}}},
-		{Key: "host", Label: "Адрес", Kind: "text", Required: true, Placeholder: "192.168.255.2"},
-		{Key: "port", Label: "Порт", Kind: "number", Required: true, Placeholder: "1080"},
-		{Key: "username", Label: "Логин", Kind: "text"},
-		{Key: "password", Label: "Пароль", Kind: "text", Secret: true},
-		{Key: "interface", Label: "Сетевой интерфейс до прокси", Kind: "interface", Advanced: true,
-			Help: "Если прокси в виртуалке на внутреннем коммутаторе Hyper-V — выберите его vEthernet-адаптер."},
-		{Key: "udp", Label: "Поддержка UDP", Kind: "bool", Default: "true", Advanced: true},
+		{Key: "proto", Label: i18n.T("providers.protocol"), Kind: "select", Default: "socks5", Options: []Option{{"socks5", "SOCKS5"}, {"http", "HTTP"}}},
+		{Key: "host", Label: i18n.T("providers.address"), Kind: "text", Required: true, Placeholder: "192.168.255.2"},
+		{Key: "port", Label: i18n.T("providers.port"), Kind: "number", Required: true, Placeholder: "1080"},
+		{Key: "username", Label: i18n.T("providers.login"), Kind: "text"},
+		{Key: "password", Label: i18n.T("providers.password"), Kind: "text", Secret: true},
+		{Key: "interface", Label: i18n.T("providers.networkInterfaceToProxy"), Kind: "interface", Advanced: true,
+			Help: i18n.T("providers.ifProxyIsInVm")},
+		{Key: "udp", Label: i18n.T("providers.udpSupport"), Kind: "bool", Default: "true", Advanced: true},
 	}
 }
 
 func (upstreamProvider) Outbound(c *config.Connection) (map[string]any, error) {
 	port, err := strconv.Atoi(c.P("port"))
 	if err != nil || port <= 0 || port > 65535 {
-		return nil, errors.New("неверный порт")
+		return nil, errors.New(i18n.T("providers.invalidPort"))
 	}
 	t := c.P("proto")
 	if t == "" {
@@ -517,13 +519,13 @@ type ifaceProvider struct{}
 func init() { Register(ifaceProvider{}) }
 
 func (ifaceProvider) Type() string     { return "interface" }
-func (ifaceProvider) Title() string    { return "Сетевой интерфейс" }
+func (ifaceProvider) Title() string    { return i18n.T("providers.networkInterface") }
 func (ifaceProvider) Runtime() Runtime { return RuntimeNative }
 func (ifaceProvider) Description() string {
-	return "Выпускать трафик через конкретный адаптер Windows: второй провайдер, USB-модем или VPN-программа на хосте, которая не перехватывает весь трафик (например, Radmin VPN)."
+	return i18n.T("providers.sendTrafficOutThroughSpecific")
 }
 func (ifaceProvider) Fields() []Field {
-	return []Field{{Key: "interface", Label: "Интерфейс", Kind: "interface", Required: true}}
+	return []Field{{Key: "interface", Label: i18n.T("providers.interface"), Kind: "interface", Required: true}}
 }
 
 func (ifaceProvider) Outbound(c *config.Connection) (map[string]any, error) {

@@ -3,6 +3,8 @@
 package hyperv
 
 import (
+	"vpner/internal/i18n"
+
 	"archive/tar"
 	"bytes"
 	"crypto/rand"
@@ -55,16 +57,16 @@ func extractRawToVHD(archive, dst string, progress deps.Progress) error {
 	defer f.Close()
 	xr, err := xz.NewReader(f)
 	if err != nil {
-		return fmt.Errorf("образ ВМ: %w", err)
+		return fmt.Errorf(i18n.T("hyperv.vmImage"), err)
 	}
 	tr := tar.NewReader(xr)
 	for {
 		h, err := tr.Next()
 		if err == io.EOF {
-			return errors.New("образ ВМ: в архиве нет disk.raw")
+			return errors.New(i18n.T("hyperv.vmImageArchiveHasNo"))
 		}
 		if err != nil {
-			return fmt.Errorf("образ ВМ: %w", err)
+			return fmt.Errorf(i18n.T("hyperv.vmImage"), err)
 		}
 		if strings.HasSuffix(h.Name, ".raw") {
 			return writeSparseVHD(tr, h.Size, dst, progress)
@@ -77,7 +79,7 @@ func extractRawToVHD(archive, dst string, progress deps.Progress) error {
 // a fixed-VHD footer.
 func writeSparseVHD(r io.Reader, size int64, dst string, progress deps.Progress) error {
 	if size%512 != 0 {
-		return errors.New("образ ВМ: размер диска не кратен 512")
+		return errors.New(i18n.T("hyperv.vmImageDiskSizeIs"))
 	}
 	out, err := os.Create(dst)
 	if err != nil {
@@ -105,10 +107,10 @@ func writeSparseVHD(r io.Reader, size int64, dst string, progress deps.Progress)
 			done += int64(n)
 		}
 		if err != nil && done < size {
-			return fmt.Errorf("образ ВМ: %w", err)
+			return fmt.Errorf(i18n.T("hyperv.vmImage"), err)
 		}
 		if progress != nil && time.Since(last) > 300*time.Millisecond {
-			progress("Подготовка диска виртуальной машины", done, size)
+			progress(i18n.T("hyperv.preparingVirtualMachineDisk"), done, size)
 			last = time.Now()
 		}
 	}
@@ -125,9 +127,9 @@ func writeSparseVHD(r io.Reader, size int64, dst string, progress deps.Progress)
 func vhdFooter(size uint64) []byte {
 	f := make([]byte, 512)
 	copy(f[0:], "conectix")
-	binary.BigEndian.PutUint32(f[8:], 2)                     // features: reserved bit
-	binary.BigEndian.PutUint32(f[12:], 0x00010000)           // format version
-	binary.BigEndian.PutUint64(f[16:], 0xFFFFFFFFFFFFFFFF)   // data offset: none (fixed)
+	binary.BigEndian.PutUint32(f[8:], 2)                   // features: reserved bit
+	binary.BigEndian.PutUint32(f[12:], 0x00010000)         // format version
+	binary.BigEndian.PutUint64(f[16:], 0xFFFFFFFFFFFFFFFF) // data offset: none (fixed)
 	ts := time.Since(time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)).Seconds()
 	binary.BigEndian.PutUint32(f[24:], uint32(ts))
 	copy(f[28:], "vpnr")

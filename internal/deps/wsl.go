@@ -1,6 +1,8 @@
 package deps
 
 import (
+	"vpner/internal/i18n"
+
 	"errors"
 	"fmt"
 	"os/exec"
@@ -54,7 +56,7 @@ func InstallWSL() (string, error) {
 	out, err := cmd.CombinedOutput()
 	s := strings.TrimSpace(strings.ReplaceAll(string(out), "\x00", ""))
 	if err != nil {
-		return s, fmt.Errorf("установка WSL: %v: %s", err, s)
+		return s, fmt.Errorf(i18n.T("deps.installingWsl"), err, s)
 	}
 	return s, nil
 }
@@ -63,7 +65,7 @@ func InstallWSL() (string, error) {
 // installs the current agent binary.
 func EnsureDistro(dataDir, cacheDir string, progress Progress) error {
 	if err := wslhost.Available(); err != nil {
-		return fmt.Errorf("%v\nWSL можно установить кнопкой «Установить WSL» (нужна перезагрузка)", err)
+		return fmt.Errorf(i18n.T("deps.wslCanBeInstalledWith"), err)
 	}
 	name := wslhost.DistroName
 	if !wslhost.DistroExists(name) {
@@ -76,7 +78,7 @@ func EnsureDistro(dataDir, cacheDir string, progress Progress) error {
 			return err
 		}
 		if progress != nil {
-			progress("Создание контейнера WSL", 0, -1)
+			progress(i18n.T("deps.creatingWslContainer"), 0, -1)
 		}
 		if err := wslhost.Import(name, filepath.Join(dataDir, "wsl"), rootfs); err != nil {
 			return err
@@ -85,7 +87,7 @@ func EnsureDistro(dataDir, cacheDir string, progress Progress) error {
 	cur, _ := wslhost.Run(name, nil, "/bin/cat", "/etc/wsl.conf")
 	if strings.TrimSpace(cur) != strings.TrimSpace(wslConf) {
 		if err := wslhost.WriteFile(name, "/etc/wsl.conf", []byte(wslConf), "644"); err != nil {
-			return fmt.Errorf("настройка контейнера: %w", err)
+			return fmt.Errorf(i18n.T("deps.settingUpContainer"), err)
 		}
 		wslhost.Terminate(name) // apply wsl.conf on next start
 	}
@@ -96,10 +98,10 @@ func EnsureDistro(dataDir, cacheDir string, progress Progress) error {
 	have, _ := wslhost.Run(name, nil, "/bin/cat", "/opt/vpner/agent.sha256")
 	if strings.TrimSpace(have) != sum {
 		if progress != nil {
-			progress("Установка агента в контейнер", 0, -1)
+			progress(i18n.T("deps.installingAgentIntoContainer"), 0, -1)
 		}
 		if err := wslhost.WriteFile(name, wslhost.AgentPath, bin, "755"); err != nil {
-			return fmt.Errorf("установка агента: %w", err)
+			return fmt.Errorf(i18n.T("deps.installingAgent"), err)
 		}
 		if err := wslhost.WriteFile(name, "/opt/vpner/agent.sha256", []byte(sum+"\n"), "644"); err != nil {
 			return err
@@ -120,7 +122,7 @@ func EnsurePackages(s *wslhost.Session, pkgs []string, progress Progress) error 
 		return nil
 	}
 	if progress != nil {
-		progress("Установка пакетов в контейнер: "+want, 0, -1)
+		progress(fmt.Sprintf(i18n.T("deps.installingPackagesIntoContainer"), want), 0, -1)
 	}
 	env := map[string]string{
 		"http_proxy": "http://127.0.0.1:3128", "https_proxy": "http://127.0.0.1:3128",
@@ -141,7 +143,7 @@ func EnsurePackages(s *wslhost.Session, pkgs []string, progress Progress) error 
 		last = errors.New(lastLines(res.Output, 8))
 	}
 	if last != nil {
-		return fmt.Errorf("не удалось установить пакеты (%s): %v", want, last)
+		return fmt.Errorf(i18n.T("deps.couldNotInstallPackages"), want, last)
 	}
 	return s.Call("exec", bridge.ExecParams{Argv: []string{"/bin/sh", "-c", "mkdir -p /opt/vpner && cat > /opt/vpner/packages.txt"}, Stdin: want + "\n"}, nil)
 }

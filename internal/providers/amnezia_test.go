@@ -90,7 +90,7 @@ func TestAmneziaTemplateKey(t *testing.T) {
 
 func TestAmneziaFullAccessKey(t *testing.T) {
 	key := amneziaKey(t, map[string]any{
-		"containers": []any{map[string]any{"container": "amnezia-awg2", "awg": map[string]any{"port": "30591", "Jc": "6"}}},
+		"containers":       []any{map[string]any{"container": "amnezia-awg2", "awg": map[string]any{"port": "30591", "Jc": "6"}}},
 		"defaultContainer": "amnezia-awg2", "description": "Мой сервер",
 		"hostName": "5.6.7.8", "userName": "root", "password": "x", "port": 22,
 	})

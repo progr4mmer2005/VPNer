@@ -1,6 +1,8 @@
 package app
 
 import (
+	"vpner/internal/i18n"
+
 	"fmt"
 	"strings"
 
@@ -22,11 +24,11 @@ func (a *App) provisionAmnezia(c *config.Connection) error {
 	if name == "" {
 		name = "VPNer"
 	}
-	a.progress("Создаю пользователя «"+name+"» на сервере Amnezia", 0, -1)
+	a.progress(fmt.Sprintf(i18n.T("app.creatingUserOnAmneziaServer"), name), 0, -1)
 	defer a.clearProgress()
 	res, err := amnezia.AddClient(k, name, c.P("hostKey"), func(s string) { a.Log.Infof("app", "Amnezia: %s", s) })
 	if err != nil {
-		return fmt.Errorf("сервер Amnezia: %w", err)
+		return fmt.Errorf(i18n.T("app.amneziaServer"), err)
 	}
 	if c.Secrets == nil {
 		c.Secrets = map[string]string{}
@@ -48,8 +50,8 @@ func (a *App) removeAmneziaClient(c config.Connection) {
 		return
 	}
 	if err := amnezia.RemoveClient(k, c.P("clientId"), c.P("hostKey")); err != nil {
-		a.Log.Warnf("app", "не удалось удалить пользователя VPNer с сервера Amnezia: %v", err)
+		a.Log.Warnf("app", i18n.T("app.couldNotRemoveVpnerUser"), err)
 		return
 	}
-	a.Log.Infof("app", "пользователь VPNer удалён с сервера Amnezia")
+	a.Log.Infof("app", "%s", i18n.T("app.vpnerUserWasRemovedFrom"))
 }

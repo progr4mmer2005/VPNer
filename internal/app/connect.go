@@ -1,6 +1,8 @@
 package app
 
 import (
+	"vpner/internal/i18n"
+
 	"context"
 	"errors"
 	"fmt"
@@ -29,10 +31,10 @@ func (a *App) Connect(id string) error {
 	cfg := a.Config()
 	c := cfg.Conn(id)
 	if c == nil {
-		return fmt.Errorf("подключение %s не найдено", id)
+		return fmt.Errorf(i18n.T("app.connectionNotFound"), id)
 	}
 	if !c.Enabled {
-		return fmt.Errorf("подключение «%s» выключено", c.Name)
+		return fmt.Errorf(i18n.T("app.connectionIsOff"), c.Name)
 	}
 	p, err := providers.Get(c.Type)
 	if err != nil {
@@ -46,7 +48,7 @@ func (a *App) Connect(id string) error {
 	case providers.NativeProvider:
 		return nil // always available while routing is on
 	}
-	return fmt.Errorf("тип %s не поддерживает подключение", c.Type)
+	return fmt.Errorf(i18n.T("app.typeCannotBeConnected"), c.Type)
 }
 
 func (a *App) setConn(id string, f func(rt *connRuntime)) {
@@ -64,7 +66,7 @@ func (a *App) setConn(id string, f func(rt *connRuntime)) {
 func (a *App) connectWSL(id, name string, p providers.WSLProvider) error {
 	a.setConn(id, func(rt *connRuntime) {
 		rt.Want = true
-		rt.State, rt.Detail, rt.Prompt = "starting", "подготовка контейнера", nil
+		rt.State, rt.Detail, rt.Prompt = "starting", i18n.T("app.preparingContainer"), nil
 		rt.Since = time.Now().Unix()
 	})
 	fail := func(err error) error {
@@ -83,7 +85,7 @@ func (a *App) connectWSL(id, name string, p providers.WSLProvider) error {
 	a.clearProgress()
 	c := a.Config().Conn(id)
 	if c == nil {
-		return fail(errors.New("подключение удалено"))
+		return fail(errors.New(i18n.T("app.connectionWasDeleted")))
 	}
 	spec, err := p.Spec(c)
 	if err != nil {
@@ -95,7 +97,7 @@ func (a *App) connectWSL(id, name string, p providers.WSLProvider) error {
 	if err := s.Call("conn.start", spec, nil); err != nil {
 		return fail(err)
 	}
-	a.Log.Infof(id, "запуск «%s» в изолированном контейнере", name)
+	a.Log.Infof(id, i18n.T("app.startingInIsolatedContainer"), name)
 	return a.applyEngine()
 }
 
@@ -146,7 +148,7 @@ func (a *App) Answer(id, text string) error {
 	s := a.wsl
 	a.mu.Unlock()
 	if s == nil {
-		return errors.New("контейнер не запущен")
+		return errors.New(i18n.T("app.containerIsNotRunning"))
 	}
 	a.setConn(id, func(rt *connRuntime) {
 		if rt.Prompt != nil && rt.Prompt.Secret && passwordPromptRe.MatchString(strings.TrimSpace(rt.Prompt.Text)) {
@@ -159,7 +161,7 @@ func (a *App) Answer(id, text string) error {
 
 // passwordPromptRe matches prompts for the account password (not one-time
 // codes or key passphrases), whose answer is worth remembering.
-var passwordPromptRe = regexp.MustCompile(`(?i)^(password|пароль openvpn)\s*:?$`)
+var passwordPromptRe = regexp.MustCompile(`(?i)^(password|пароль openvpn|openvpn password)\s*:?$`)
 
 // rememberPassword saves a password the user typed once it has worked, so
 // the next login does not ask again.
@@ -176,13 +178,13 @@ func (a *App) rememberPassword(id, pw string) {
 	}
 	c.Secrets["password"] = pw
 	if err := a.store.Save(cfg); err != nil {
-		a.Log.Errorf(id, "не удалось сохранить пароль: %v", err)
+		a.Log.Errorf(id, i18n.T("app.couldNotSavePassword"), err)
 		return
 	}
 	a.mu.Lock()
 	a.cfg = cfg
 	a.mu.Unlock()
-	a.Log.Infof(id, "введённый пароль подошёл и сохранён — в следующий раз он подставится сам")
+	a.Log.Infof(id, "%s", i18n.T("app.enteredPasswordWorkedAndIs"))
 }
 
 // ---- local SOCKS endpoints (mihomo -> vpner -> namespace) ----
@@ -229,7 +231,7 @@ func (b *wslBackend) session() (*wslhost.Session, error) {
 	s := b.a.wsl
 	b.a.mu.Unlock()
 	if s == nil {
-		return nil, errors.New("контейнер WSL не запущен")
+		return nil, errors.New(i18n.T("app.wslContainerIsNotRunning"))
 	}
 	return s, nil
 }
@@ -275,7 +277,7 @@ func (a *App) ensureWSL() (*wslhost.Session, error) {
 		a.clearProgress()
 		return nil, err
 	}
-	a.progress("Запуск агента в контейнере", 0, -1)
+	a.progress(i18n.T("app.startingAgentInContainer"), 0, -1)
 	s := &wslhost.Session{
 		Distro:    wslhost.DistroName,
 		Logf:      func(l string) { a.Log.Add("agent", "info", l) },
@@ -308,7 +310,7 @@ func (a *App) watchWSL(s *wslhost.Session) {
 	for id, rt := range a.conns {
 		if rt.Want {
 			want = append(want, id)
-			rt.State, rt.Detail = "down", "контейнер WSL перезапускается"
+			rt.State, rt.Detail = "down", i18n.T("app.wslContainerIsRestarting")
 		}
 	}
 	running := a.running
@@ -317,11 +319,11 @@ func (a *App) watchWSL(s *wslhost.Session) {
 	if !running {
 		return
 	}
-	a.Log.Errorf("app", "агент WSL отключился — перезапуск")
+	a.Log.Errorf("app", "%s", i18n.T("app.wslAgentDisconnectedRestarting"))
 	time.Sleep(3 * time.Second)
 	for _, id := range want {
 		if err := a.Connect(id); err != nil {
-			a.Log.Errorf(id, "переподключение: %v", err)
+			a.Log.Errorf(id, i18n.T("app.reconnecting2"), err)
 		}
 	}
 }
@@ -350,7 +352,7 @@ func (a *App) onAgentEvent(ev bridge.Event) {
 			}
 		})
 		if st.State == "up" {
-			a.Log.Infof(ev.ID, "туннель поднят: адрес %s, DNS %v", st.IP, st.DNS)
+			a.Log.Infof(ev.ID, i18n.T("app.tunnelUpAddressDns"), st.IP, st.DNS)
 			a.mu.Lock()
 			pw := a.typedPass[ev.ID]
 			delete(a.typedPass, ev.ID)
@@ -364,9 +366,9 @@ func (a *App) onAgentEvent(ev bridge.Event) {
 			rt.Prompt = &Prompt{Text: ev.Prompt, Secret: ev.Secret}
 			rt.State = "auth"
 		})
-		a.Log.Infof(ev.ID, "ожидается ввод: %s", ev.Prompt)
+		a.Log.Infof(ev.ID, i18n.T("app.inputExpected"), ev.Prompt)
 		if a.OnAttention != nil {
-			go a.OnAttention(ev.ID, a.ConnName(ev.ID), "запрашивает ввод: "+ev.Prompt)
+			go a.OnAttention(ev.ID, a.ConnName(ev.ID), fmt.Sprintf(i18n.T("app.asksForInput"), ev.Prompt))
 		}
 	case "attention":
 		a.Log.Infof(ev.ID, "%s", ev.Prompt)
@@ -381,12 +383,12 @@ func (a *App) onAgentEvent(ev bridge.Event) {
 const ssoPort = "127.0.0.1:29786"
 
 func (a *App) onOpenURL(conn, url string) {
-	a.Log.Infof(conn, "вход через браузер: %s", url)
+	a.Log.Infof(conn, i18n.T("app.browserSignIn"), url)
 	a.startSSOForwarder(conn)
 	cmd := exec.Command("rundll32.exe", "url.dll,FileProtocolHandler", url)
 	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 	if err := cmd.Start(); err != nil {
-		a.Log.Errorf(conn, "не удалось открыть браузер: %v — откройте ссылку вручную", err)
+		a.Log.Errorf(conn, i18n.T("app.couldNotOpenBrowserOpen"), err)
 	}
 }
 
@@ -400,7 +402,7 @@ func (a *App) startSSOForwarder(conn string) {
 	l, err := net.Listen("tcp4", ssoPort)
 	if err != nil {
 		a.mu.Unlock()
-		a.Log.Errorf(conn, "порт входа %s занят: %v", ssoPort, err)
+		a.Log.Errorf(conn, i18n.T("app.signInPortIsBusy"), ssoPort, err)
 		return
 	}
 	a.ssoFwd = l

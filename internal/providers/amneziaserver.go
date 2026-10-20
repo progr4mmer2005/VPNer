@@ -1,6 +1,8 @@
 package providers
 
 import (
+	"vpner/internal/i18n"
+
 	"errors"
 	"strings"
 
@@ -16,24 +18,24 @@ type amneziaServerProvider struct{}
 func init() { Register(amneziaServerProvider{}) }
 
 func (amneziaServerProvider) Type() string     { return "amnezia-server" }
-func (amneziaServerProvider) Title() string    { return "Amnezia — ключ полного доступа" }
+func (amneziaServerProvider) Title() string    { return i18n.T("providers.amneziaFullAccessKey") }
 func (amneziaServerProvider) Runtime() Runtime { return RuntimeNative }
 func (amneziaServerProvider) Description() string {
-	return "Ключ полного доступа к вашему серверу AmneziaVPN. VPNer сам создаст на сервере отдельного пользователя со своими ключами (он появится в приложении AmneziaVPN) и подключится как встроенный AmneziaWG."
+	return i18n.T("providers.fullAccessKeyToYour")
 }
 
 func (amneziaServerProvider) Fields() []Field {
 	return []Field{
-		{Key: "key", Label: "Ключ полного доступа (vpn://)", Kind: "textarea", Secret: true, Required: true,
-			Help: "Тот же ключ, которым сервер добавляется в приложение AmneziaVPN. Хранится зашифрованным и используется только для создания/удаления пользователя VPNer."},
-		{Key: "clientName", Label: "Имя пользователя на сервере", Kind: "text", Default: "VPNer"},
-		{Key: "mtu", Label: "MTU (пусто = из настроек сервера)", Kind: "number", Advanced: true},
+		{Key: "key", Label: i18n.T("providers.fullAccessKeyVpn"), Kind: "textarea", Secret: true, Required: true,
+			Help: i18n.T("providers.sameKeyThatAddsServer")},
+		{Key: "clientName", Label: i18n.T("providers.userNameOnServer"), Kind: "text", Default: "VPNer"},
+		{Key: "mtu", Label: i18n.T("providers.mtuEmptyFromServerSettings"), Kind: "number", Advanced: true},
 	}
 }
 
 func (p amneziaServerProvider) client(c *config.Connection) (*config.Connection, error) {
 	if strings.TrimSpace(c.S("config")) == "" {
-		return nil, errors.New("пользователь на сервере ещё не создан — сохраните подключение, чтобы VPNer его создал")
+		return nil, errors.New(i18n.T("providers.userOnServerIsNot"))
 	}
 	tmp := *c
 	tmp.Secrets = map[string]string{"config": c.S("config")}

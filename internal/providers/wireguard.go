@@ -1,6 +1,8 @@
 package providers
 
 import (
+	"vpner/internal/i18n"
+
 	"bufio"
 	"bytes"
 	"compress/zlib"
@@ -28,14 +30,14 @@ func (wireguardProvider) Type() string     { return "wireguard" }
 func (wireguardProvider) Title() string    { return "WireGuard / AmneziaWG" }
 func (wireguardProvider) Runtime() Runtime { return RuntimeNative }
 func (wireguardProvider) Description() string {
-	return "Конфиг .conf от WireGuard или AmneziaWG (включая AWG 1.5/2.0 с Jc/S1–S4/H1–H4/I1–I5) либо ключ vpn:// из AmneziaVPN. Работает прямо в движке, без отдельной программы."
+	return i18n.T("providers.wireguardOrAmneziawgConfConfig")
 }
 
 func (wireguardProvider) Fields() []Field {
 	return []Field{
-		{Key: "config", Label: "Конфиг (.conf) или ключ vpn://", Kind: "textarea", Secret: true, Required: true,
+		{Key: "config", Label: i18n.T("providers.configConfOrVpnKey"), Kind: "textarea", Secret: true, Required: true,
 			Placeholder: "[Interface]\nPrivateKey = ...\nAddress = 10.8.0.2/32\nDNS = 1.1.1.1\nJc = 4\n...\n\n[Peer]\nPublicKey = ...\nEndpoint = 1.2.3.4:51820\nAllowedIPs = 0.0.0.0/0"},
-		{Key: "mtu", Label: "MTU (пусто = из конфига)", Kind: "number", Advanced: true},
+		{Key: "mtu", Label: i18n.T("providers.mtuEmptyFromConfig"), Kind: "number", Advanced: true},
 	}
 }
 
@@ -81,14 +83,14 @@ func parseWGConf(text string) (*wgConf, error) {
 		cur[k] = v
 	}
 	if c.Iface["privatekey"] == "" {
-		return nil, errors.New("в конфиге нет [Interface] PrivateKey")
+		return nil, errors.New(i18n.T("providers.configHasNoInterfacePrivatekey"))
 	}
 	if len(c.Peers) == 0 {
-		return nil, errors.New("в конфиге нет секции [Peer]")
+		return nil, errors.New(i18n.T("providers.configHasNoPeerSection"))
 	}
 	for i, p := range c.Peers {
 		if p["publickey"] == "" || p["endpoint"] == "" {
-			return nil, fmt.Errorf("peer %d: нужны PublicKey и Endpoint", i+1)
+			return nil, fmt.Errorf(i18n.T("providers.peerPublickeyAndEndpointAre"), i+1)
 		}
 	}
 	return c, nil
@@ -101,7 +103,7 @@ func splitHostPortDefault(ep string) (string, int, error) {
 	}
 	port, err := strconv.Atoi(p)
 	if err != nil {
-		return "", 0, fmt.Errorf("Endpoint %q: неверный порт", ep)
+		return "", 0, fmt.Errorf(i18n.T("providers.endpointInvalidPort"), ep)
 	}
 	return h, port, nil
 }
@@ -154,7 +156,7 @@ func (p wireguardProvider) Outbound(c *config.Connection) (map[string]any, error
 		}
 	}
 	if _, ok := out["ip"]; !ok {
-		return nil, errors.New("в Address нет IPv4-адреса")
+		return nil, errors.New(i18n.T("providers.addressHasNoIpv4Address"))
 	}
 	// Without an IPv6 address inside the tunnel, resolve and dial IPv4 only;
 	// otherwise every connection first waits for an IPv6 attempt to fail.
@@ -334,7 +336,7 @@ func decodeAmneziaKey(key string) (conf, desc string, err error) {
 		}
 	}
 	if err != nil {
-		return "", "", fmt.Errorf("vpn:// ключ: неверный base64")
+		return "", "", errors.New(i18n.T("providers.vpnKeyInvalidBase64"))
 	}
 	var js []byte
 	if len(b) > 4 {
@@ -353,7 +355,7 @@ func decodeAmneziaKey(key string) (conf, desc string, err error) {
 	}
 	var root any
 	if err := json.Unmarshal(js, &root); err != nil {
-		return "", "", fmt.Errorf("vpn:// ключ: не JSON: %v", err)
+		return "", "", fmt.Errorf(i18n.T("providers.vpnKeyNotJson"), err)
 	}
 	rootMap, _ := root.(map[string]any)
 	if d, ok := rootMap["description"].(string); ok {
@@ -430,9 +432,9 @@ func decodeAmneziaKey(key string) (conf, desc string, err error) {
 	walk(root)
 	if found == "" {
 		if _, ok := rootMap["userName"]; ok {
-			return "", desc, errors.New("это ключ полного доступа к серверу — выберите тип «Amnezia — ключ полного доступа»")
+			return "", desc, errors.New(i18n.T("providers.thisIsFullAccessKey"))
 		}
-		return "", desc, errors.New("в ключе vpn:// не найден конфиг WireGuard/AmneziaWG (протоколы OpenVPN/Cloak пока не поддерживаются; XRay экспортируйте ссылкой vless://)")
+		return "", desc, errors.New(i18n.T("providers.noWireguardAmneziawgConfigFound"))
 	}
 	conf, err = fillAmneziaTemplate(found, rootMap)
 	return conf, desc, err
@@ -529,7 +531,7 @@ func fillAmneziaTemplate(tmpl string, sources ...map[string]any) (string, error)
 		out = append(out, filled)
 	}
 	if len(missing) > 0 {
-		return "", fmt.Errorf("в ключе vpn:// не хватает значений: %s — экспортируйте ключ из AmneziaVPN ещё раз", strings.Join(missing, ", "))
+		return "", fmt.Errorf(i18n.T("providers.vpnKeyLacksValuesExport"), strings.Join(missing, ", "))
 	}
 	return strings.Join(out, "\n"), nil
 }

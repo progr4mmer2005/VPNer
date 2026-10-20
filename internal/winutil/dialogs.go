@@ -3,6 +3,8 @@
 package winutil
 
 import (
+	"vpner/internal/i18n"
+
 	"errors"
 	"path/filepath"
 	"runtime"
@@ -84,7 +86,7 @@ func SaveFileDialog(title, fileName, filterName, ext string) (path string, ok bo
 	}
 	if r, _, _ := procGetSaveFileNameW.Call(uintptr(unsafe.Pointer(&ofn))); r == 0 {
 		if code, _, _ := procCommDlgExtendedError.Call(); code != 0 {
-			return "", false, errors.New("не удалось открыть окно сохранения")
+			return "", false, errors.New(i18n.T("winutil.couldNotOpenSaveDialog"))
 		}
 		return "", false, nil // cancelled
 	}
@@ -111,7 +113,7 @@ func ClipboardText() (string, error) {
 		}
 	}
 	if !opened {
-		return "", errors.New("буфер обмена занят другой программой")
+		return "", errors.New(i18n.T("winutil.clipboardIsBusyWithAnother"))
 	}
 	defer procCloseClipboard.Call()
 	const cfUnicodeText = 13

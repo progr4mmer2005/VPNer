@@ -3,6 +3,8 @@
 package engine
 
 import (
+	"vpner/internal/i18n"
+
 	"fmt"
 	"net"
 	"regexp"
@@ -195,10 +197,10 @@ func Generate(in GenInput) (map[string]any, error) {
 		"geo-auto-update":     true,
 		"geo-update-interval": 72,
 		"profile":             map[string]any{"store-selected": false, "store-fake-ip": true},
-		"dns":       dnsSection,
-		"proxies":   proxies,
-		"listeners": listeners,
-		"rules":     rules,
+		"dns":                 dnsSection,
+		"proxies":             proxies,
+		"listeners":           listeners,
+		"rules":               rules,
 	}
 	dnsSection["fake-ip-filter"] = fakeFilter
 	if !s.NoTun {
@@ -301,7 +303,7 @@ func ruleLines(r config.Rule, tgt string) ([]string, error) {
 			line = "DOMAIN-KEYWORD," + escapeRule(strings.ToLower(v)) + "," + tgt
 		case config.RuleDomainRegex:
 			if _, err := regexp.Compile(v); err != nil {
-				return nil, fmt.Errorf("неверное регулярное выражение %q: %v", v, err)
+				return nil, fmt.Errorf(i18n.T("engine.invalidRegularExpression"), v, err)
 			}
 			line = "DOMAIN-REGEX," + escapeRule(v) + "," + tgt
 		case config.RuleIPCIDR:
@@ -315,7 +317,7 @@ func ruleLines(r config.Rule, tgt string) ([]string, error) {
 			}
 			ip, _, err := net.ParseCIDR(cidr)
 			if err != nil {
-				return nil, fmt.Errorf("неверная подсеть %q", v)
+				return nil, fmt.Errorf(i18n.T("engine.invalidSubnet"), v)
 			}
 			kind := "IP-CIDR"
 			if ip.To4() == nil {
@@ -337,7 +339,7 @@ func ruleLines(r config.Rule, tgt string) ([]string, error) {
 		case config.RuleNetwork:
 			line = "NETWORK," + strings.ToUpper(v) + "," + tgt
 		default:
-			return nil, fmt.Errorf("неизвестный тип правила %q", r.Kind)
+			return nil, fmt.Errorf(i18n.T("engine.unknownRuleType"), r.Kind)
 		}
 		out = append(out, line)
 	}

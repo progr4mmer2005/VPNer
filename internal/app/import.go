@@ -1,6 +1,8 @@
 package app
 
 import (
+	"vpner/internal/i18n"
+
 	"errors"
 	"fmt"
 	"io"
@@ -75,7 +77,7 @@ func (a *App) ImportData(filename, data string, dry bool, opt ImportOptions) (*I
 	if err := a.commit(cfg); err != nil {
 		return nil, err
 	}
-	a.Log.Infof("app", "импорт (%s): подключений %d, правил %d", res.Kind, len(res.Connections), len(res.Rules))
+	a.Log.Infof("app", i18n.T("app.importConnectionsRules"), res.Kind, len(res.Connections), len(res.Rules))
 	return out, nil
 }
 
@@ -86,7 +88,7 @@ func (a *App) Import(filename, data string) (string, error) {
 		return "", err
 	}
 	if len(out.IDs) == 0 {
-		return "", errors.New("ничего не импортировано")
+		return "", errors.New(i18n.T("app.nothingWasImported"))
 	}
 	return out.IDs[0], nil
 }
@@ -101,21 +103,21 @@ func (a *App) Export(withSecrets bool) ([]byte, error) {
 func (a *App) FetchSubscription(raw string) (string, error) {
 	raw = NormalizeSubscription(raw)
 	if strings.HasPrefix(strings.ToLower(raw), "happ://crypt") {
-		return "", errors.New("это зашифрованная ссылка Happ (happ://crypt…) — её может открыть только сам Happ. Возьмите у провайдера обычную ссылку подписки https://…")
+		return "", errors.New(i18n.T("app.thisIsEncryptedHappLink"))
 	}
 	u, err := url.Parse(raw)
 	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
-		return "", errors.New("нужна ссылка вида https://…")
+		return "", errors.New(i18n.T("app.httpsLinkIsNeeded"))
 	}
 	req, _ := http.NewRequest(http.MethodGet, u.String(), nil)
 	req.Header.Set("User-Agent", "clash.meta/VPNer")
 	resp, err := (&http.Client{Timeout: 30 * time.Second, Transport: &http.Transport{Proxy: nil}}).Do(req)
 	if err != nil {
-		return "", fmt.Errorf("подписка недоступна: %w", err)
+		return "", fmt.Errorf(i18n.T("app.subscriptionIsUnavailable"), err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("подписка: HTTP %s", resp.Status)
+		return "", fmt.Errorf(i18n.T("app.subscriptionHttp"), resp.Status)
 	}
 	b, err := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
 	if err != nil {

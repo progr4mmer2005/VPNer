@@ -5,6 +5,8 @@
 package main
 
 import (
+	"vpner/internal/i18n"
+
 	"compress/gzip"
 	"crypto/rand"
 	"embed"
@@ -34,7 +36,8 @@ var version = "0.1.0"
 //go:embed all:payload
 var payload embed.FS
 
-const windowTitle = "Установка VPNer"
+// windowTitle is the wizard page title (see setupBoot in the UI).
+func windowTitle() string { return i18n.T("setup.vpnerSetup") }
 
 type step struct {
 	Text string `json:"text"`
@@ -47,6 +50,7 @@ type setup struct {
 	appearance json.RawMessage
 	steps      []step
 	installing bool
+	lang       string // chosen in the wizard ("" = not chosen, keep the setting)
 	done       bool
 	err        string
 	lastPing   time.Time
@@ -56,18 +60,20 @@ type setup struct {
 
 func (st *setup) exit() { st.quitOnce.Do(func() { close(st.quit) }) }
 
-func store() *config.Store { return &config.Store{Path: filepath.Join(install.DataDir(), "config.json")} }
+func store() *config.Store {
+	return &config.Store{Path: filepath.Join(install.DataDir(), "config.json")}
+}
 
 func main() {
 	if !winutil.IsAdmin() {
 		if err := winutil.RelaunchElevated(os.Args[1:]); err != nil {
-			winutil.MessageBox(windowTitle, "Для установки нужны права администратора.\n"+err.Error(), true)
+			winutil.MessageBox(windowTitle(), fmt.Sprintf(i18n.T("setup.administratorRightsAreNeededTo"), err), true)
 		}
 		return
 	}
 	first, release := winutil.SingleInstance("VPNerSetup")
 	if !first {
-		winutil.FocusAppWindow(windowTitle)
+		winutil.FocusAppWindow(windowTitle())
 		return
 	}
 	defer release()
@@ -76,6 +82,9 @@ func main() {
 		opts: install.Options{Dir: install.DefaultDir(), Desktop: true, StartMenu: true, Launch: true, Autostart: winutil.AutostartEnabled()}}
 	if cfg, err := store().Load(); err == nil {
 		st.appearance = cfg.Appearance // an update keeps the current look as the default choice
+		i18n.SetLang(i18n.Resolve(cfg.Settings.Language))
+	} else {
+		i18n.SetLang(i18n.Resolve(""))
 	}
 
 	tok := make([]byte, 24)
@@ -83,7 +92,7 @@ func main() {
 	token := hex.EncodeToString(tok)
 	l, err := net.Listen("tcp4", "127.0.0.1:0")
 	if err != nil {
-		winutil.MessageBox(windowTitle, err.Error(), true)
+		winutil.MessageBox(windowTitle(), err.Error(), true)
 		return
 	}
 	mux := http.NewServeMux()
@@ -94,7 +103,7 @@ func main() {
 	url := fmt.Sprintf("http://127.0.0.1:%d/#%s", l.Addr().(*net.TCPAddr).Port, token)
 	cmd, err := winutil.StartAppWindow(url, profile, 940, 720)
 	if err != nil {
-		winutil.MessageBox(windowTitle, "Для установщика нужен Microsoft Edge (он есть в Windows 10 и 11).\n"+err.Error(), true)
+		winutil.MessageBox(windowTitle(), fmt.Sprintf(i18n.T("setup.installerNeedsMicrosoftEdgeIt"), err), true)
 		return
 	}
 	opened := time.Now()
@@ -118,7 +127,7 @@ func main() {
 		}
 	}()
 	<-st.quit
-	winutil.CloseAppWindows(windowTitle)
+	winutil.CloseAppWindows(windowTitle())
 	time.Sleep(time.Second)
 	os.RemoveAll(profile)
 }
@@ -154,7 +163,7 @@ func (st *setup) routes(mux *http.ServeMux) {
 		st.mu.Unlock()
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Header().Set("Content-Security-Policy", web.CSP)
-		w.Write(web.Page(look, "window.VPNER_SETUP = true;"))
+		w.Write(web.Page(look, web.LangScript()+"window.VPNER_SETUP = true;"))
 	})
 	// what the interface needs to start (an empty program, the saved look)
 	mux.HandleFunc("GET /api/config", func(w http.ResponseWriter, r *http.Request) {
@@ -177,7 +186,7 @@ func (st *setup) routes(mux *http.ServeMux) {
 	mux.HandleFunc("PUT /api/appearance", func(w http.ResponseWriter, r *http.Request) {
 		b, err := io.ReadAll(io.LimitReader(r.Body, 512<<10))
 		if err != nil || !json.Valid(b) {
-			writeErr(w, fmt.Errorf("настройки оформления повреждены"))
+			writeErr(w, errors.New(i18n.T("setup.appearanceSettingsAreDamaged")))
 			return
 		}
 		st.mu.Lock()
@@ -191,6 +200,21 @@ func (st *setup) routes(mux *http.ServeMux) {
 		st.mu.Lock()
 		defer st.mu.Unlock()
 		writeJSON(w, map[string]any{"version": version, "installed": installed, "running": install.Running(), "opts": st.opts})
+	})
+	mux.HandleFunc("POST /api/setup/lang", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Lang string `json:"lang"`
+		}
+		json.NewDecoder(io.LimitReader(r.Body, 4<<10)).Decode(&req)
+		if !i18n.Has(req.Lang) {
+			writeErr(w, fmt.Errorf("%s", req.Lang))
+			return
+		}
+		i18n.SetLang(req.Lang)
+		st.mu.Lock()
+		st.lang = req.Lang
+		st.mu.Unlock()
+		writeJSON(w, map[string]bool{"ok": true})
 	})
 	mux.HandleFunc("POST /api/setup/ping", func(w http.ResponseWriter, r *http.Request) {
 		st.mu.Lock()
@@ -207,7 +231,7 @@ func (st *setup) routes(mux *http.ServeMux) {
 		st.mu.Lock()
 		if st.installing {
 			st.mu.Unlock()
-			writeErr(w, fmt.Errorf("установка уже идёт"))
+			writeErr(w, errors.New(i18n.T("setup.installationIsAlreadyRunning")))
 			return
 		}
 		st.opts, st.installing, st.done, st.err, st.steps = o, true, false, "", nil
@@ -248,7 +272,7 @@ func (st *setup) step(text string) {
 func unpack() ([]byte, error) {
 	f, err := payload.Open("payload/" + install.ExeName + ".gz")
 	if err != nil {
-		return nil, errors.New("в установщике нет программы (собран без неё)")
+		return nil, errors.New(i18n.T("setup.installerHasNoProgramInside"))
 	}
 	defer f.Close()
 	zr, err := gzip.NewReader(f)
@@ -264,7 +288,7 @@ func (st *setup) run(o install.Options) {
 		err = install.Install(exe, version, o, st.step)
 	}
 	if err == nil {
-		st.step("сохраняю выбранное оформление")
+		st.step(i18n.T("setup.savingChosenAppearance"))
 		err = st.saveLook(o)
 	}
 	st.mu.Lock()
@@ -294,6 +318,11 @@ func (st *setup) saveLook(o install.Options) error {
 	}
 	st.mu.Unlock()
 	cfg.Settings.Autostart = o.Autostart
+	st.mu.Lock()
+	if st.lang != "" {
+		cfg.Settings.Language = st.lang
+	}
+	st.mu.Unlock()
 	os.MkdirAll(filepath.Dir(s.Path), 0o700)
 	return s.Save(cfg)
 }

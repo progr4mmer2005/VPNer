@@ -5,6 +5,8 @@
 package amnezia
 
 import (
+	"vpner/internal/i18n"
+
 	"bytes"
 	"compress/zlib"
 	"crypto/rand"
@@ -49,7 +51,7 @@ func DecodeKey(key string) (map[string]any, error) {
 		}
 	}
 	if err != nil {
-		return nil, errors.New("ключ vpn://: неверный base64")
+		return nil, errors.New(i18n.T("amnezia.vpnKeyInvalidBase64"))
 	}
 	var js []byte
 	if len(b) > 4 {
@@ -62,7 +64,7 @@ func DecodeKey(key string) (map[string]any, error) {
 	}
 	var root map[string]any
 	if err := json.Unmarshal(js, &root); err != nil {
-		return nil, fmt.Errorf("ключ vpn://: не JSON: %v", err)
+		return nil, fmt.Errorf(i18n.T("amnezia.vpnKeyNotJson"), err)
 	}
 	return root, nil
 }
@@ -108,7 +110,7 @@ func ParseAdminKey(key string) (*AdminKey, error) {
 		k.SSHPort = p
 	}
 	if k.Host == "" || k.User == "" || k.Secret == "" {
-		return nil, errors.New("это не ключ полного доступа (нет адреса сервера или логина)")
+		return nil, errors.New(i18n.T("amnezia.thisIsNotFullAccess"))
 	}
 	def := str(root["defaultContainer"])
 	conts, _ := root["containers"].([]any)
@@ -139,7 +141,7 @@ func ParseAdminKey(key string) (*AdminKey, error) {
 		}
 	}
 	if len(cands) == 0 {
-		return nil, errors.New("на сервере из ключа нет протокола AmneziaWG/WireGuard — установите его в приложении AmneziaVPN")
+		return nil, errors.New(i18n.T("amnezia.keysServerHasNoAmneziawg"))
 	}
 	k.Container, k.Params = cands[0].name, cands[0].params
 	return k, nil
@@ -174,7 +176,7 @@ func dial(k *AdminKey, expectHostKey string) (*session, error) {
 	if strings.Contains(k.Secret, "PRIVATE KEY") {
 		signer, err := ssh.ParsePrivateKey([]byte(k.Secret))
 		if err != nil {
-			return nil, fmt.Errorf("SSH-ключ из ключа Amnezia не читается: %v", err)
+			return nil, fmt.Errorf(i18n.T("amnezia.sshKeyInAmneziaKey"), err)
 		}
 		auths = append(auths, ssh.PublicKeys(signer))
 	} else {
@@ -195,7 +197,7 @@ func dial(k *AdminKey, expectHostKey string) (*session, error) {
 		HostKeyCallback: func(_ string, _ net.Addr, key ssh.PublicKey) error {
 			fp := ssh.FingerprintSHA256(key)
 			if expectHostKey != "" && fp != expectHostKey {
-				return fmt.Errorf("ключ сервера изменился (%s, ожидался %s) — возможна подмена, операция отменена", fp, expectHostKey)
+				return fmt.Errorf(i18n.T("amnezia.serverKeyChangedExpectedPossible"), fp, expectHostKey)
 			}
 			s.host = fp
 			return nil
@@ -203,7 +205,7 @@ func dial(k *AdminKey, expectHostKey string) (*session, error) {
 	}
 	cl, err := ssh.Dial("tcp", net.JoinHostPort(k.Host, strconv.Itoa(k.SSHPort)), cfg)
 	if err != nil {
-		return nil, fmt.Errorf("не удалось подключиться к серверу по SSH: %v", err)
+		return nil, fmt.Errorf(i18n.T("amnezia.couldNotConnectToServer"), err)
 	}
 	s.cl = cl
 	return s, nil
@@ -289,7 +291,7 @@ func nextIP(serverConf, subnet string) (string, error) {
 			return out.String(), nil
 		}
 	}
-	return "", errors.New("на сервере не осталось свободных адресов")
+	return "", errors.New(i18n.T("amnezia.noFreeAddressesLeftOn"))
 }
 
 // serverParams reads obfuscation settings from the server config; the
@@ -345,10 +347,10 @@ func AddClient(k *AdminKey, clientName, expectHostKey string, logf func(string))
 	}
 	defer s.close()
 	lay := layoutFor(k.Container)
-	logf("подключился к серверу, читаю настройки " + k.Container)
+	logf(fmt.Sprintf(i18n.T("amnezia.connectedToServerReadingSettings"), k.Container))
 	conf, err := s.inContainer(k.Container, "cat "+lay.conf)
 	if err != nil {
-		return nil, fmt.Errorf("не удалось прочитать конфиг сервера (%s): %v", lay.conf, err)
+		return nil, fmt.Errorf(i18n.T("amnezia.couldNotReadServerConfig"), lay.conf, err)
 	}
 	serverPub, err := s.inContainer(k.Container, "cat "+lay.pub)
 	if err != nil {
@@ -360,7 +362,7 @@ func AddClient(k *AdminKey, clientName, expectHostKey string, logf func(string))
 	}
 	serverPub, psk = strings.TrimSpace(serverPub), strings.TrimSpace(psk)
 	if serverPub == "" || psk == "" {
-		return nil, errors.New("на сервере нет ключей AmneziaWG")
+		return nil, errors.New(i18n.T("amnezia.serverHasNoAmneziawgKeys"))
 	}
 	ip, err := nextIP(conf, str(k.Params["subnet_address"]))
 	if err != nil {
@@ -375,9 +377,9 @@ func AddClient(k *AdminKey, clientName, expectHostKey string, logf func(string))
 	cmd := fmt.Sprintf("cp %[1]s %[1]s.vpner-backup && echo %[2]s | base64 -d >> %[1]s && %[3]s syncconf %[4]s <(%[3]s-quick strip %[1]s)",
 		lay.conf, base64.StdEncoding.EncodeToString([]byte(block)), lay.tool, lay.iface)
 	if _, err := s.inContainer(k.Container, cmd); err != nil {
-		return nil, fmt.Errorf("не удалось добавить клиента на сервер: %v", err)
+		return nil, fmt.Errorf(i18n.T("amnezia.couldNotAddClientTo"), err)
 	}
-	logf(fmt.Sprintf("на сервере создан клиент «%s» с адресом %s", clientName, ip))
+	logf(fmt.Sprintf(i18n.T("amnezia.clientWithAddressCreatedOn"), clientName, ip))
 	addToClientsTable(s, k.Container, pub, clientName, logf)
 
 	params := serverParams(conf)
@@ -398,7 +400,7 @@ func AddClient(k *AdminKey, clientName, expectHostKey string, logf func(string))
 		port = params["ListenPort"]
 	}
 	if port == "" {
-		return nil, errors.New("не удалось узнать порт AmneziaWG на сервере")
+		return nil, errors.New(i18n.T("amnezia.couldNotFindAmneziawgPort"))
 	}
 	mtu := str(k.Params["mtu"])
 	if mtu == "" {
@@ -432,7 +434,7 @@ func addToClientsTable(s *session, container, clientID, name string, logf func(s
 	var table []map[string]any
 	if strings.TrimSpace(raw) != "" {
 		if err := json.Unmarshal([]byte(raw), &table); err != nil {
-			logf("список пользователей на сервере в неизвестном формате — не трогаю его")
+			logf(i18n.T("amnezia.serversUserListHasUnknown"))
 			return
 		}
 	}
@@ -441,7 +443,7 @@ func addToClientsTable(s *session, container, clientID, name string, logf func(s
 	b, _ := json.Marshal(table)
 	cmd := fmt.Sprintf("mkdir -p /opt/amnezia/%s && echo %s | base64 -d > %s", container, base64.StdEncoding.EncodeToString(b), path)
 	if _, err := s.inContainer(container, cmd); err == nil {
-		logf("клиент добавлен в список пользователей — он виден в приложении AmneziaVPN")
+		logf(i18n.T("amnezia.clientAddedToUserList"))
 	}
 }
 

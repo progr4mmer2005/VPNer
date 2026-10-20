@@ -3,6 +3,8 @@
 package assets
 
 import (
+	"vpner/internal/i18n"
+
 	"bytes"
 	"compress/gzip"
 	"crypto/sha256"
@@ -24,7 +26,7 @@ func Agent(arch string) ([]byte, string, error) {
 	}
 	gz, err := files.ReadFile("agent/vpner-agent-linux-" + arch + ".gz")
 	if err != nil {
-		return nil, "", fmt.Errorf("в эту сборку не встроен агент для linux/%s — соберите программу через build.ps1", arch)
+		return nil, "", fmt.Errorf(i18n.T("assets.thisBuildHasNoAgent"), arch)
 	}
 	zr, err := gzip.NewReader(bytes.NewReader(gz))
 	if err != nil {

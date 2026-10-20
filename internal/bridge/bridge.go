@@ -95,14 +95,14 @@ type ProcSpec struct {
 	// OpenVPNMgmt: the daemon is OpenVPN started with a management socket at
 	// {{dir}}/mgmt.sock; the agent answers its credential and MFA queries
 	// (static/dynamic challenge, private key password) through the UI.
-	OpenVPNMgmt bool   `json:"openvpnMgmt,omitempty"`
+	OpenVPNMgmt bool `json:"openvpnMgmt,omitempty"`
 	// ReachedPattern marks that the VPN server has answered; only then can a
 	// silent wait after sending credentials mean "waiting for confirmation".
 	ReachedPattern string `json:"reachedPattern,omitempty"`
 	// PendingPattern means the server explicitly put the login on hold
 	// (e.g. OpenVPN AUTH_PENDING): show "waiting for confirmation" at once.
 	PendingPattern string `json:"pendingPattern,omitempty"`
-	Creds       *Creds `json:"creds,omitempty"`
+	Creds          *Creds `json:"creds,omitempty"`
 	// KeepAlive, when > 0, sends a tiny DNS query through the tunnel every
 	// that many seconds, so servers do not end an idle session (each new
 	// session would need the login confirmed again).

@@ -3,6 +3,8 @@
 package agent
 
 import (
+	"vpner/internal/i18n"
+
 	"bufio"
 	"encoding/json"
 	"errors"
@@ -77,13 +79,13 @@ func (a *Agent) onHook(m hookMsg) error {
 		c.mu.Lock()
 		c.sawUp, c.pending = false, nil
 		c.mu.Unlock()
-		c.setState("down", "туннель закрыт")
+		c.setState("down", i18n.T("agent.tunnelClosed"))
 	case "reconnecting":
-		c.setState("starting", "переподключение")
+		c.setState("starting", i18n.T("agent.reconnecting"))
 	case "log":
 		c.log(m.Line)
 	case "openurl":
-		c.log("открываю страницу входа в браузере: " + m.URL)
+		c.log(fmt.Sprintf(i18n.T("agent.openingSignInPageIn"), m.URL))
 		bc, _, err := bridge.Open(a.sess, bridge.Header{Op: bridge.OpOpenURL, Conn: m.ID, URL: m.URL})
 		if err != nil {
 			return err

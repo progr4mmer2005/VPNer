@@ -7,6 +7,8 @@
 package firewall
 
 import (
+	"vpner/internal/i18n"
+
 	"errors"
 	"fmt"
 	"os"
@@ -52,7 +54,7 @@ func psq(s string) string { return "'" + strings.ReplaceAll(s, "'", "''") + "'" 
 // network directly (the engine and VPNer itself).
 func (k *KillSwitch) Enable(programs []string, allowLAN bool) error {
 	if !windows.GetCurrentProcessToken().IsElevated() {
-		return errors.New("системный kill-switch требует прав администратора — запустите VPNer обычным способом (он сам запросит права)")
+		return errors.New(i18n.T("firewall.systemKillSwitchNeedsAdministrator"))
 	}
 	os.MkdirAll(k.StateDir, 0o700)
 	var b strings.Builder
@@ -74,7 +76,7 @@ func (k *KillSwitch) Enable(programs []string, allowLAN bool) error {
 	b.WriteString("Set-NetFirewallProfile -All -Enabled True -DefaultOutboundAction Block;\n")
 	if _, err := ps(b.String()); err != nil {
 		k.Disable()
-		return fmt.Errorf("не удалось включить системный kill-switch (Брандмауэр Windows): %w", err)
+		return fmt.Errorf(i18n.T("firewall.couldNotTurnOnSystem"), err)
 	}
 	return nil
 }
@@ -103,7 +105,7 @@ if (Test-Path $p) {
 Get-NetFirewallRule -Group $g -ErrorAction SilentlyContinue | Remove-NetFirewallRule
 `, psq(group), psq(k.backupPath()))
 	if _, err := ps(script); err != nil {
-		return fmt.Errorf("не удалось восстановить Брандмауэр Windows: %w", err)
+		return fmt.Errorf(i18n.T("firewall.couldNotRestoreWindowsFirewall"), err)
 	}
 	os.Remove(k.backupPath())
 	return nil

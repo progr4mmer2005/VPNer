@@ -1,6 +1,8 @@
 package app
 
 import (
+	"vpner/internal/i18n"
+
 	"strings"
 	"time"
 
@@ -51,7 +53,7 @@ func (a *App) checkForeign() {
 	a.mu.Unlock()
 	if changed {
 		if len(found) > 0 {
-			a.Log.Warnf("app", "одновременно с VPNer работает другой VPN: %s — он перехватывает трафик и мешает подключениям VPNer", strings.Join(found, ", "))
+			a.Log.Warnf("app", i18n.T("app.anotherVpnRunsAlongsideVpner"), strings.Join(found, ", "))
 		}
 		a.notify()
 	}
@@ -81,7 +83,7 @@ func (a *App) probeNative(m *engine.Mihomo) {
 			h.fails, h.down, h.lastOK = 0, false, time.Now()
 			a.mu.Unlock()
 			if wasDown {
-				a.Log.Infof(c.ID, "«%s» снова отвечает", c.Name)
+				a.Log.Infof(c.ID, i18n.T("app.respondsAgain"), c.Name)
 				a.notify()
 			}
 			continue
@@ -90,7 +92,7 @@ func (a *App) probeNative(m *engine.Mihomo) {
 		if h.fails >= recoverAfter && !h.down {
 			h.down = true
 			a.mu.Unlock()
-			a.Log.Warnf(c.ID, "«%s» не отвечает (%v)", c.Name, err)
+			a.Log.Warnf(c.ID, i18n.T("app.doesNotRespond"), c.Name, err)
 			a.notify()
 			a.mu.Lock()
 		}
@@ -106,7 +108,7 @@ func (a *App) probeNative(m *engine.Mihomo) {
 	if len(needRecover) == 0 {
 		return
 	}
-	a.Log.Warnf("app", "переподключаю: %s", strings.Join(needRecover, ", "))
+	a.Log.Warnf("app", i18n.T("app.reconnecting"), strings.Join(needRecover, ", "))
 	var err error
 	if tunnels {
 		// A new tunnel process: fresh handshakes from new UDP ports, and
@@ -116,14 +118,14 @@ func (a *App) probeNative(m *engine.Mihomo) {
 		err = m.Reload()
 	}
 	if err != nil {
-		a.Log.Errorf("app", "переподключение: %v", err)
+		a.Log.Errorf("app", i18n.T("app.reconnecting2"), err)
 	}
 }
 
 // nativeState reports the health of a built-in connection for the UI.
 func (a *App) nativeStateLocked(id string) (string, string) {
 	if h := a.health[id]; h != nil && h.down {
-		return "down", "нет ответа через это подключение — переподключаю автоматически"
+		return "down", i18n.T("app.noAnswerThroughThisConnection")
 	}
 	return "ready", ""
 }

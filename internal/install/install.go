@@ -5,6 +5,8 @@
 package install
 
 import (
+	"vpner/internal/i18n"
+
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -75,36 +77,36 @@ func DataDir() string {
 func Install(payload []byte, version string, o Options, step func(string)) error {
 	dir := filepath.Clean(strings.TrimSpace(o.Dir))
 	if dir == "." || !filepath.IsAbs(dir) {
-		return errors.New("укажите полный путь к папке установки")
+		return errors.New(i18n.T("install.enterFullPathOfInstallation"))
 	}
 	if len(payload) == 0 {
-		return errors.New("в установщике нет программы (собран без неё)")
+		return errors.New(i18n.T("install.installerHasNoProgramInside"))
 	}
 	if Running() {
-		step("закрываю запущенный VPNer")
+		step(i18n.T("install.closingRunningVpner"))
 		if err := StopRunning(); err != nil {
 			return err
 		}
 	}
-	step("копирую программу в " + dir)
+	step(fmt.Sprintf(i18n.T("install.copyingProgramTo"), dir))
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return fmt.Errorf("папка установки: %w", err)
+		return fmt.Errorf(i18n.T("install.installationFolder"), err)
 	}
 	exe := filepath.Join(dir, ExeName)
 	tmp := exe + ".new"
 	if err := os.WriteFile(tmp, payload, 0o755); err != nil {
-		return fmt.Errorf("запись программы: %w", err)
+		return fmt.Errorf(i18n.T("install.writingProgram"), err)
 	}
 	if err := os.Rename(tmp, exe); err != nil {
 		os.Remove(tmp)
-		return fmt.Errorf("замена программы: %w", err)
+		return fmt.Errorf(i18n.T("install.replacingProgram"), err)
 	}
-	step("регистрирую в «Приложениях» Windows")
+	step(i18n.T("install.registeringInWindowsInstalledApps"))
 	if err := register(dir, exe, version, len(payload)); err != nil {
 		return err
 	}
 	if o.StartMenu {
-		step("создаю ярлык в меню «Пуск»")
+		step(i18n.T("install.creatingStartMenuShortcut"))
 		if err := shortcut(startMenuLink(), exe, dir); err != nil {
 			return err
 		}
@@ -112,14 +114,14 @@ func Install(payload []byte, version string, o Options, step func(string)) error
 		os.Remove(startMenuLink())
 	}
 	if o.Desktop {
-		step("создаю ярлык на рабочем столе")
+		step(i18n.T("install.creatingDesktopShortcut"))
 		if err := shortcut(desktopLink(), exe, dir); err != nil {
 			return err
 		}
 	} else {
 		os.Remove(desktopLink())
 	}
-	step("настраиваю автозапуск")
+	step(i18n.T("install.settingUpAutostart"))
 	if err := setAutostart(exe, o.Autostart); err != nil {
 		return err
 	}
@@ -129,7 +131,7 @@ func Install(payload []byte, version string, o Options, step func(string)) error
 func register(dir, exe, version string, size int) error {
 	k, _, err := registry.CreateKey(registry.LOCAL_MACHINE, regKey, registry.SET_VALUE|registry.WOW64_64KEY)
 	if err != nil {
-		return fmt.Errorf("запись в реестр: %w", err)
+		return fmt.Errorf(i18n.T("install.writingToRegistry"), err)
 	}
 	defer k.Close()
 	for name, v := range map[string]string{
@@ -154,7 +156,9 @@ func knownFolder(id *windows.KNOWNFOLDERID) string {
 func startMenuLink() string {
 	return filepath.Join(knownFolder(windows.FOLDERID_CommonPrograms), AppName+".lnk")
 }
-func desktopLink() string { return filepath.Join(knownFolder(windows.FOLDERID_Desktop), AppName+".lnk") }
+func desktopLink() string {
+	return filepath.Join(knownFolder(windows.FOLDERID_Desktop), AppName+".lnk")
+}
 
 func psq(s string) string { return "'" + strings.ReplaceAll(s, "'", "''") + "'" }
 
@@ -167,7 +171,7 @@ func shortcut(lnk, exe, dir string) error {
 	script := fmt.Sprintf(`$s = (New-Object -ComObject WScript.Shell).CreateShortcut(%s); $s.TargetPath = %s; $s.WorkingDirectory = %s; $s.IconLocation = %s; $s.Description = 'VPNer — несколько VPN одновременно'; $s.Save()`,
 		psq(lnk), psq(exe), psq(dir), psq(exe+",0"))
 	if out, err := hidden(exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script)).CombinedOutput(); err != nil {
-		return fmt.Errorf("ярлык %s: %v: %s", lnk, err, strings.TrimSpace(string(out)))
+		return fmt.Errorf(i18n.T("install.shortcut"), lnk, err, strings.TrimSpace(string(out)))
 	}
 	return nil
 }
@@ -181,7 +185,7 @@ func setAutostart(exe string, on bool) error {
 	out, err := hidden(exec.Command("schtasks.exe", "/Create", "/TN", AppName, "/TR", fmt.Sprintf(`"%s" --tray`, exe),
 		"/SC", "ONLOGON", "/RL", "HIGHEST", "/F")).CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("автозапуск: %v: %s", err, strings.TrimSpace(string(out)))
+		return fmt.Errorf(i18n.T("install.autostart"), err, strings.TrimSpace(string(out)))
 	}
 	return nil
 }
@@ -230,7 +234,7 @@ func StopRunning() error {
 		}
 		time.Sleep(500 * time.Millisecond)
 	}
-	return errors.New("VPNer не закрылся — закройте его через значок в трее и повторите")
+	return errors.New(i18n.T("install.vpnerDidNotCloseClose"))
 }
 
 // Uninstall removes the program. removeData also deletes the settings and

@@ -3,6 +3,8 @@
 package agent
 
 import (
+	"vpner/internal/i18n"
+
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -250,7 +252,7 @@ func (c *conn) supervise() {
 			c.setState("stopped", "")
 			break
 		}
-		detail := "процесс завершился"
+		detail := i18n.T("agent.processExited")
 		if err != nil {
 			detail = err.Error()
 		}
@@ -261,7 +263,7 @@ func (c *conn) supervise() {
 		if time.Since(start) > time.Minute {
 			backoff = 3 * time.Second
 		}
-		c.setState("down", detail+fmt.Sprintf("; переподключение через %v", backoff))
+		c.setState("down", detail+fmt.Sprintf(i18n.T("agent.reconnectingIn"), backoff))
 		select {
 		case <-time.After(backoff):
 		case <-c.a.quit:
@@ -314,7 +316,7 @@ func (c *conn) runOnce() error {
 	c.pending = nil
 	c.reached, c.credsSent = false, false
 	c.mu.Unlock()
-	c.setState("starting", "запущен "+c.spec.Argv[0])
+	c.setState("starting", fmt.Sprintf(i18n.T("agent.started"), c.spec.Argv[0]))
 	if c.spec.OpenVPNMgmt {
 		go c.runOpenVPNMgmt(cmd)
 	}
@@ -331,7 +333,7 @@ func (c *conn) runOnce() error {
 	c.answerHook = nil
 	c.mu.Unlock()
 	if c.State() == "up" {
-		c.setState("down", "туннель закрыт")
+		c.setState("down", i18n.T("agent.tunnelClosed"))
 	}
 	if err != nil {
 		return fmt.Errorf("%s: %v", c.spec.Argv[0], err)
@@ -419,7 +421,7 @@ func (c *conn) onPrompt(p string) {
 				c.mu.Lock()
 				continue
 			}
-			c.log("вход не был подтверждён — повторяю с сохранённым паролем")
+			c.log(i18n.T("agent.loginWasNotConfirmedRetrying"))
 			c.mu.Lock()
 		}
 		c.answered[i] = true
@@ -433,7 +435,7 @@ func (c *conn) onPrompt(p string) {
 		return
 	}
 	c.mu.Unlock()
-	c.setState("auth", "ожидается ввод: "+p)
+	c.setState("auth", fmt.Sprintf(i18n.T("agent.inputExpected"), p))
 	c.a.emit(bridge.Event{Type: "prompt", ID: c.spec.ID, Prompt: p, Secret: secretPromptRe.MatchString(p)})
 }
 
@@ -461,14 +463,14 @@ func (c *conn) afterCredentials() {
 	})
 }
 
-const confirmMsg = "ожидает дополнительного подтверждения входа"
+func confirmMsg() string { return i18n.T("agent.waitingForAdditionalLoginConfirmation") }
 
 func (c *conn) markConfirm() {
 	if c.State() == "confirm" {
 		return
 	}
-	c.setState("confirm", confirmMsg)
-	c.a.emit(bridge.Event{Type: "attention", ID: c.spec.ID, Prompt: confirmMsg})
+	c.setState("confirm", confirmMsg())
+	c.a.emit(bridge.Event{Type: "attention", ID: c.spec.ID, Prompt: confirmMsg()})
 }
 
 // askUser shows a prompt in the UI; the answer goes to hook.
@@ -476,7 +478,7 @@ func (c *conn) askUser(prompt string, secret bool, hook func(string)) {
 	c.mu.Lock()
 	c.answerHook = hook
 	c.mu.Unlock()
-	c.setState("auth", "ожидается ввод: "+prompt)
+	c.setState("auth", fmt.Sprintf(i18n.T("agent.inputExpected"), prompt))
 	c.a.emit(bridge.Event{Type: "prompt", ID: c.spec.ID, Prompt: prompt, Secret: secret})
 }
 
@@ -490,7 +492,7 @@ func (c *conn) answer(text string) error {
 		c.mu.Unlock()
 		h(text)
 		if c.State() == "auth" {
-			c.setState("starting", "ответ отправлен")
+			c.setState("starting", i18n.T("agent.answerSent"))
 		}
 		c.afterCredentials()
 		return nil
@@ -499,11 +501,11 @@ func (c *conn) answer(text string) error {
 	c.mu.Unlock()
 	defer c.afterCredentials()
 	if w == nil {
-		return errors.New("процесс не запущен")
+		return errors.New(i18n.T("agent.processIsNotRunning"))
 	}
 	_, err := io.WriteString(w, text+"\n")
 	if c.State() == "auth" {
-		c.setState("starting", "ответ отправлен")
+		c.setState("starting", i18n.T("agent.answerSent"))
 	}
 	return err
 }
@@ -576,7 +578,7 @@ func (c *conn) reportUp(tun, ip string, dns []string) {
 	if c.upRe != nil && !c.sawUp {
 		c.pending = &bridge.ConnStatus{Tun: tun, IP: ip, DNS: dns}
 		c.mu.Unlock()
-		c.log("hook: туннель создан, жду подтверждения от " + c.spec.Argv[0])
+		c.log(fmt.Sprintf(i18n.T("agent.hookTunnelCreatedWaitingFor"), c.spec.Argv[0]))
 		return
 	}
 	c.mu.Unlock()
@@ -588,7 +590,7 @@ func (c *conn) setUp(tun, ip string, dns []string) {
 	c.slowRetries = 0
 	c.status.State = "up"
 	c.status.Since = time.Now().Unix()
-	c.status.Detail = "туннель поднят"
+	c.status.Detail = i18n.T("agent.tunnelUp")
 	c.status.Tun, c.status.IP = tun, ip
 	if len(dns) == 0 {
 		dns = c.spec.FallbackDNS
@@ -628,7 +630,7 @@ func (c *conn) log(line string) {
 		wasUp := c.status.State == "up"
 		c.mu.Unlock()
 		if wasUp {
-			c.setState("down", "туннель прерван: "+line)
+			c.setState("down", fmt.Sprintf(i18n.T("agent.tunnelInterrupted"), line))
 		}
 		return
 	}

@@ -3,6 +3,8 @@
 package app
 
 import (
+	"vpner/internal/i18n"
+
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -39,27 +41,27 @@ type App struct {
 
 	ops sync.Mutex // serialises lifecycle operations
 
-	mu        sync.Mutex
-	cfg       *config.Config
-	running   bool
-	starting  bool
-	lastError string
-	setup     *SetupState
-	engine    *engine.Mihomo
-	tun       *tunnelProc // WireGuard/AmneziaWG tunnels, see tunnels.go
-	tunMu     sync.Mutex  // serialises syncTunnels
-	wsl       *wslhost.Session
-	wslReady  bool
-	endpoints map[string]*endpoint
+	mu          sync.Mutex
+	cfg         *config.Config
+	running     bool
+	starting    bool
+	lastError   string
+	setup       *SetupState
+	engine      *engine.Mihomo
+	tun         *tunnelProc // WireGuard/AmneziaWG tunnels, see tunnels.go
+	tunMu       sync.Mutex  // serialises syncTunnels
+	wsl         *wslhost.Session
+	wslReady    bool
+	endpoints   map[string]*endpoint
 	vms         map[string]*vmRuntime
 	health      map[string]*nativeHealth
 	quitAsk     bool // the user asked to quit while VPNs were running
 	foreign     []string
 	monStop     chan struct{}
 	vmEndpoints map[string]engine.LocalEndpoint
-	testPorts map[string]int
-	conns     map[string]*connRuntime
-	ssoFwd    net.Listener
+	testPorts   map[string]int
+	conns       map[string]*connRuntime
+	ssoFwd      net.Listener
 	// typedPass holds a password the user typed at a prompt; it is saved
 	// into the connection once the tunnel comes up with it.
 	typedPass map[string]string
@@ -109,30 +111,31 @@ func New(dataDir string) (*App, error) {
 		return nil, err
 	}
 	a := &App{
-		DataDir:   dataDir,
-		Log:       NewLogger(filepath.Join(dataDir, "logs")),
-		store:     &config.Store{Path: filepath.Join(dataDir, "config.json")},
-		ks:        &firewall.KillSwitch{StateDir: dataDir},
-		endpoints: map[string]*endpoint{},
+		DataDir:     dataDir,
+		Log:         NewLogger(filepath.Join(dataDir, "logs")),
+		store:       &config.Store{Path: filepath.Join(dataDir, "config.json")},
+		ks:          &firewall.KillSwitch{StateDir: dataDir},
+		endpoints:   map[string]*endpoint{},
 		vms:         map[string]*vmRuntime{},
 		health:      map[string]*nativeHealth{},
 		vmEndpoints: map[string]engine.LocalEndpoint{},
-		testPorts: map[string]int{},
-		conns:     map[string]*connRuntime{},
-		typedPass: map[string]string{},
-		subs:      map[chan struct{}]struct{}{},
+		testPorts:   map[string]int{},
+		conns:       map[string]*connRuntime{},
+		typedPass:   map[string]string{},
+		subs:        map[chan struct{}]struct{}{},
 	}
 	cfg, err := a.store.Load()
 	if err != nil {
 		return nil, err
 	}
 	a.cfg = cfg
+	i18n.SetLang(i18n.Resolve(cfg.Settings.Language))
 	return a, nil
 }
 
-func (a *App) binDir() string      { return filepath.Join(a.DataDir, "bin") }
-func (a *App) cacheDir() string    { return filepath.Join(a.DataDir, "downloads") }
-func (a *App) engineDir() string   { return filepath.Join(a.DataDir, "engine") }
+func (a *App) binDir() string                   { return filepath.Join(a.DataDir, "bin") }
+func (a *App) cacheDir() string                 { return filepath.Join(a.DataDir, "downloads") }
+func (a *App) engineDir() string                { return filepath.Join(a.DataDir, "engine") }
 func (a *App) KillSwitch() *firewall.KillSwitch { return a.ks }
 
 // ---- change notification for the UI ----
@@ -244,7 +247,7 @@ func (a *App) SaveConnection(c config.Connection) (string, error) {
 	} else {
 		old := cfg.Conn(c.ID)
 		if old == nil {
-			return "", fmt.Errorf("подключение %s не найдено", c.ID)
+			return "", fmt.Errorf(i18n.T("app.connectionNotFound"), c.ID)
 		}
 		keyChanged := c.Type == "amnezia-server" && c.Secrets["key"] != "" && c.Secrets["key"] != old.Secrets["key"]
 		for k, v := range old.Secrets {
@@ -270,7 +273,7 @@ func (a *App) SaveConnection(c config.Connection) (string, error) {
 	if err := a.commit(cfg); err != nil {
 		return "", err
 	}
-	a.Log.Infof("app", "сохранено подключение «%s»", c.Name)
+	a.Log.Infof("app", i18n.T("app.connectionSaved"), c.Name)
 	return c.ID, nil
 }
 
@@ -333,7 +336,7 @@ func (a *App) DeleteConnection(id string) error {
 			def = []string{config.DNSSystemID}
 		}
 		cfg.DNS.Default = def
-		a.Log.Warnf("app", "удалены DNS-серверы, работавшие через «%s»", name)
+		a.Log.Warnf("app", i18n.T("app.removedDnsServersThatWent"), name)
 	}
 	a.mu.Lock()
 	delete(a.conns, id)
@@ -341,7 +344,7 @@ func (a *App) DeleteConnection(id string) error {
 	if err := a.commit(cfg); err != nil {
 		return err
 	}
-	a.Log.Infof("app", "удалено подключение «%s»; правила, которые вели в него, теперь блокируют трафик", name)
+	a.Log.Infof("app", i18n.T("app.connectionDeletedRulesThatLed"), name)
 	return nil
 }
 
@@ -385,7 +388,7 @@ func (a *App) SaveDNS(d config.DNS) error {
 func (a *App) DNSQuery(name, qtype string) (any, error) {
 	m := a.Engine()
 	if m == nil {
-		return nil, errors.New("включите маршрутизацию, чтобы проверить DNS")
+		return nil, errors.New(i18n.T("app.turnRoutingOnToCheck"))
 	}
 	return m.DNSQuery(name, qtype)
 }
@@ -394,10 +397,10 @@ func (a *App) DNSQuery(name, qtype string) (any, error) {
 // so the engine is not touched.
 func (a *App) SaveAppearance(raw json.RawMessage) error {
 	if len(raw) > 256<<10 {
-		return errors.New("настройки оформления слишком большие")
+		return errors.New(i18n.T("app.appearanceSettingsAreTooLarge"))
 	}
 	if !json.Valid(raw) {
-		return errors.New("настройки оформления повреждены")
+		return errors.New(i18n.T("app.appearanceSettingsAreDamaged"))
 	}
 	a.ops.Lock()
 	defer a.ops.Unlock()
@@ -422,6 +425,7 @@ func (a *App) SaveSettings(s config.Settings) error {
 	if err := a.commit(cfg); err != nil {
 		return err
 	}
+	i18n.SetLang(i18n.Resolve(s.Language))
 	if prevAuto != s.Autostart {
 		if err := winutil.SetAutostart(s.Autostart); err != nil {
 			return err
@@ -438,7 +442,6 @@ func (a *App) SaveSettings(s config.Settings) error {
 	}
 	return nil
 }
-
 
 // ---- lifecycle ----
 
@@ -475,7 +478,7 @@ func (a *App) Start() error {
 		a.Stop()
 		return err
 	}
-	a.Log.Infof("app", "маршрутизация включена")
+	a.Log.Infof("app", "%s", i18n.T("app.routingIsOn"))
 	var ids []string
 	for _, c := range a.Config().Connections {
 		if c.Enabled && c.Autostart && needsRuntime(c.Type) {
@@ -489,7 +492,7 @@ func (a *App) Start() error {
 	for _, id := range ids {
 		a.setConn(id, func(rt *connRuntime) {
 			rt.Want = true
-			rt.State, rt.Detail, rt.Prompt = "queued", "подключится сам, по очереди", nil
+			rt.State, rt.Detail, rt.Prompt = "queued", i18n.T("app.connectsByItselfInTurn"), nil
 			rt.Since = time.Now().Unix()
 		})
 	}
@@ -502,7 +505,7 @@ func (a *App) Start() error {
 				continue // the user connected or cancelled it meanwhile
 			}
 			a.autoConnect(id)
-			wait := fmt.Sprintf("подключится сам, когда завершится вход в «%s»", a.ConnName(id))
+			wait := fmt.Sprintf(i18n.T("app.connectsByItselfOnceLogin"), a.ConnName(id))
 			for _, next := range ids[k+1:] {
 				a.setConn(next, func(rt *connRuntime) {
 					if rt.State == "queued" {
@@ -518,7 +521,7 @@ func (a *App) Start() error {
 
 func (a *App) autoConnect(id string) {
 	if err := a.Connect(id); err != nil {
-		a.Log.Errorf(id, "автоподключение: %v", err)
+		a.Log.Errorf(id, i18n.T("app.autoconnect"), err)
 	}
 }
 
@@ -559,7 +562,7 @@ func (a *App) startLocked() error {
 		return err
 	}
 	if n := engine.KillStray(bin); n > 0 {
-		a.Log.Warnf("app", "завершено %d зависших процессов движка от прошлого запуска", n)
+		a.Log.Warnf("app", i18n.T("app.endedHungEngineProcessesLeft"), n)
 	}
 	port, err := freePort()
 	if err != nil {
@@ -570,24 +573,24 @@ func (a *App) startLocked() error {
 	a.mu.Lock()
 	a.engine = m
 	a.mu.Unlock()
-	a.progress("Запуск туннелей", 0, -1)
+	a.progress(i18n.T("app.startingTunnels"), 0, -1)
 	if err := a.syncTunnels(false); err != nil {
-		a.Log.Errorf("app", "процесс туннелей: %v — туннели будут работать внутри движка", err)
+		a.Log.Errorf("app", i18n.T("app.tunnelProcessTunnelsWillRun"), err)
 	}
 	conf, err := a.genConfig()
 	if err != nil {
 		return err
 	}
-	a.progress("Проверка конфигурации движка", 0, -1)
+	a.progress(i18n.T("app.checkingEngineConfiguration"), 0, -1)
 	if err := m.Test(conf); err != nil {
 		return err
 	}
-	a.progress("Запуск движка маршрутизации", 0, -1)
+	a.progress(i18n.T("app.startingRoutingEngine"), 0, -1)
 	if err := m.Start(conf); err != nil {
 		return err
 	}
 	v, _ := m.Version()
-	a.Log.Infof("app", "движок mihomo %s запущен", v)
+	a.Log.Infof("app", i18n.T("app.mihomoEngineStarted"), v)
 	go a.watchEngine(m)
 	a.mu.Lock()
 	a.monStop = make(chan struct{})
@@ -611,7 +614,7 @@ func (a *App) enableKillSwitch() error {
 	if err := a.ks.Enable([]string{exe, bin}, a.Config().Settings.AllowLAN); err != nil {
 		return err
 	}
-	a.Log.Infof("app", "системный kill-switch включён: при сбое трафик блокируется, а не идёт напрямую")
+	a.Log.Infof("app", "%s", i18n.T("app.systemKillSwitchOnOn"))
 	return nil
 }
 
@@ -630,7 +633,7 @@ func (a *App) watchEngine(m *engine.Mihomo) {
 	if !cur {
 		return
 	}
-	a.Log.Errorf("app", "движок неожиданно завершился — перезапуск")
+	a.Log.Errorf("app", "%s", i18n.T("app.engineExitedUnexpectedlyRestarting"))
 	for attempt := 1; ; attempt++ {
 		time.Sleep(time.Duration(min(attempt, 10)) * time.Second)
 		a.mu.Lock()
@@ -644,11 +647,11 @@ func (a *App) watchEngine(m *engine.Mihomo) {
 			err = m.Start(conf)
 		}
 		if err == nil {
-			a.Log.Infof("app", "движок перезапущен")
+			a.Log.Infof("app", "%s", i18n.T("app.engineRestarted"))
 			go a.watchEngine(m)
 			return
 		}
-		a.Log.Errorf("app", "перезапуск движка: %v", err)
+		a.Log.Errorf("app", i18n.T("app.restartingEngine"), err)
 	}
 }
 
@@ -684,7 +687,7 @@ func (a *App) Stop() error {
 	// without the engine those lead nowhere.
 	winutil.FlushDNS()
 	if wasRunning {
-		a.Log.Infof("app", "маршрутизация выключена, сеть в обычном режиме")
+		a.Log.Infof("app", "%s", i18n.T("app.routingIsOffNetworkIs"))
 	}
 	a.notify()
 	return errors.Join(errs...)
@@ -708,7 +711,7 @@ func (a *App) applyEngine() error {
 		return nil
 	}
 	if err := a.syncTunnels(false); err != nil {
-		a.Log.Errorf("app", "процесс туннелей: %v", err)
+		a.Log.Errorf("app", i18n.T("app.tunnelProcess"), err)
 	}
 	conf, err := a.genConfig()
 	if err != nil {
@@ -758,7 +761,7 @@ func (a *App) genConfig() (map[string]any, error) {
 	}
 	a.mu.Unlock()
 	if m == nil {
-		return nil, errors.New("движок не запущен")
+		return nil, errors.New(i18n.T("app.engineIsNotRunning"))
 	}
 	cfg.Settings.LogLevel = "debug" // filtered in engineLog
 	exe, _ := os.Executable()
@@ -906,9 +909,9 @@ func (a *App) Engine() *engine.Mihomo {
 func (a *App) ConnName(id string) string {
 	switch id {
 	case "DIRECT", "direct-out":
-		return "Напрямую"
+		return i18n.T("app.direct")
 	case "REJECT", "REJECT-DROP":
-		return "Заблокировано"
+		return i18n.T("app.blocked")
 	}
 	if c := a.Config().Conn(id); c != nil {
 		return c.Name

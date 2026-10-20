@@ -3,6 +3,8 @@
 package hyperv
 
 import (
+	"vpner/internal/i18n"
+
 	"encoding/json"
 	"fmt"
 	"os"
@@ -66,17 +68,8 @@ ReadWritePaths=/srv/vpner-share
 WantedBy=multi-user.target
 `
 
-const readme = `Это виртуальная машина VPNer.
-
-1. Установите сюда вашу VPN-программу (AmneziaVPN, Cisco Secure Client и т.д.).
-   Установщик можно скачать в Firefox или передать из VPNer:
-   «Подключения» -> карточка этой ВМ -> «Передать файл» (файл появится в папке «Файлы из VPNer» на рабочем столе).
-2. Подключите VPN в программе как обычно.
-3. VPNer сам увидит туннель и начнёт направлять сюда трафик по вашим правилам.
-
-Защита: служба шлюза может отправлять трафик ТОЛЬКО через туннель VPN-программы.
-Если VPN отключится — трафик по правилам для этой ВМ блокируется, а не идёт напрямую.
-`
+// readme is put on the VM desktop.
+func readme() string { return i18n.T("hyperv.thisIsVpnerVirtualMachine") }
 
 func yamlStr(s string) string {
 	b, _ := json.Marshal(s) // JSON strings are valid YAML scalars
@@ -125,7 +118,7 @@ ethernets:
 	if c.Desktop {
 		desktopPkgs = "xfce4 xfce4-terminal xfce4-whiskermenu-plugin thunar mousepad lightdm lightdm-gtk-greeter firefox-esr firefox-esr-l10n-ru dbus-x11 xserver-xorg-core xserver-xorg-input-libinput fonts-dejavu fonts-noto-color-emoji xdg-utils policykit-1 gvfs file-roller"
 		desktopCmds = `  - [sh, -c, "DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ` + desktopPkgs + `"]
-  - [sh, -c, "mkdir -p /home/vpner/Desktop && ln -sfn /srv/vpner-share '/home/vpner/Desktop/Файлы из VPNer' && cp /etc/vpner/README.txt /home/vpner/Desktop/README.txt && chown -R vpner:vpner /home/vpner"]
+  - [sh, -c, "mkdir -p /home/vpner/Desktop && ln -sfn /srv/vpner-share '/home/vpner/Desktop/` + i18n.T("hyperv.filesFolder") + `' && cp /etc/vpner/README.txt /home/vpner/Desktop/README.txt && chown -R vpner:vpner /home/vpner"]
   - [sh, -c, "printf '[Seat:*]\nautologin-user=vpner\nautologin-session=xfce\n' > /etc/lightdm/lightdm.conf.d/50-vpner.conf"]
   - [sh, -c, "printf 'XKBLAYOUT=\"us,ru\"\nXKBOPTIONS=\"grp:alt_shift_toggle\"\n' > /etc/default/keyboard"]
   - [systemctl, set-default, graphical.target]
@@ -182,7 +175,7 @@ runcmd:
 %[7]s`, c.Hostname, yamlStr(c.ConsolePass),
 		indent(fmt.Sprintf(killSwitchNFT, LANHost), "      "),
 		indent(gatewayUnit, "      "),
-		indent(readme, "      "),
+		indent(readme(), "      "),
 		indent(string(gw), "      "),
 		desktopCmds)
 

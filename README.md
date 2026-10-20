@@ -129,6 +129,17 @@ The script downloads a pinned Go toolchain into `.tools`, builds the Linux agent
 - Cisco servers that require HostScan/posture checks need the original client in a virtual machine.
 - Virtual machines need Windows Pro/Enterprise with Hyper-V; their first setup takes 10–15 minutes.
 
+## Author
+
+**programmer2005** — just a student who needed several VPNs at once for work: corporate ones plus a personal one for AI services. They kept conflicting with each other, and that is how VPNer appeared.
+
+- Telegram: [@programmer2005](https://t.me/programmer2005)
+- GitHub: [progr4mmer2005](https://github.com/progr4mmer2005)
+
+## Support the project
+
+If VPNer saves you time, you can support its development on **[Boosty](https://boosty.to/programmer2005)** — any amount helps.
+
 ## Project status
 
 > [!IMPORTANT]

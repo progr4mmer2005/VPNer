@@ -129,6 +129,17 @@ powershell -ExecutionPolicy Bypass -File build.ps1
 - Серверам Cisco с проверкой рабочего места (HostScan/posture) нужен оригинальный клиент в виртуалке.
 - Виртуалкам нужна Windows Pro/Enterprise с Hyper-V; первая настройка ВМ занимает 10–15 минут.
 
+## Об авторе
+
+**programmer2005** — обычный студент. Для работы понадобилось держать несколько VPN сразу: корпоративные и свой личный, чтобы пользоваться нейросетями. Они постоянно конфликтовали между собой — так и появился VPNer.
+
+- Telegram: [@programmer2005](https://t.me/programmer2005)
+- GitHub: [progr4mmer2005](https://github.com/progr4mmer2005)
+
+## Поддержать проект
+
+Если VPNer экономит вам время, поддержать разработку можно на **[Boosty](https://boosty.to/programmer2005)** — любая сумма помогает.
+
 ## Статус проекта
 
 > [!IMPORTANT]

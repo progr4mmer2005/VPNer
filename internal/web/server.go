@@ -35,7 +35,9 @@ var indexHTML []byte
 type Server struct {
 	App   *app.App
 	Token string
-	Port  int
+	// Version of the program, shown in Settings.
+	Version string
+	Port    int
 	// OnQuit is called when the user chooses "Выход" in the UI.
 	OnQuit  func()
 	srv     *http.Server
@@ -479,7 +481,7 @@ func (s *Server) routes(mux *http.ServeMux) {
 	})
 	mux.HandleFunc("GET /api/info", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]any{
-			"admin": winutil.IsAdmin(), "dataDir": s.App.DataDir, "mihomo": deps.MihomoVersion,
+			"version": s.Version, "admin": winutil.IsAdmin(), "dataDir": s.App.DataDir, "mihomo": deps.MihomoVersion,
 			"wslPackages": providers.AllPackages(),
 		})
 	})

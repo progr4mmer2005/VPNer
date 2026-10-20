@@ -750,7 +750,7 @@
  "ui.servers": "Servers",
  "ui.setAddedClickSaveRules": "Set added — click “Save rules”",
  "ui.settings": "Settings",
- "ui.settings.dataDir": "Program data: %s · mihomo engine %s",
+ "ui.settings.dataDir": "VPNer %s · program data: %s · mihomo engine %s",
  "ui.settings.dnsTab": "Servers (DoH, DoT, DoQ…), rules for domains and the mode are on the %s tab.",
  "ui.settings.done": "Done: %s",
  "ui.settings.language": "Language",

@@ -1,129 +1,139 @@
+<div align="center">
+
 # VPNer
 
-Программа для Windows. Позволяет одновременно держать несколько VPN и решать, какие программы, сайты и IP через какой из них идут. VPN не конфликтуют между собой, и трафик одного не может утечь через другой или мимо всех.
+**Several VPNs at once on Windows — without conflicts and without leaks.**
+Every program, site and IP goes through the connection you choose.
 
-## Как это устроено
+[![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078d4)](#requirements)
+[![Status](https://img.shields.io/badge/status-early%20beta-orange)](#project-status)
+[![Vibe-coded](https://img.shields.io/badge/vibe--coded%20with-Claude%20Opus%205.5-d97757)](#project-status)
+
+**English** · [Русский](README.ru.md)
+
+![Connections](docs/screenshots/connections-en.png)
+
+</div>
+
+## What it is
+
+Corporate Cisco for work, OpenVPN for another client, AmneziaWG for everything else — normally these VPNs fight over routes, DNS and kill switches, and traffic of one leaks through another. VPNer runs them **side by side, each in isolation**, and sends traffic by your rules:
+
+- `jira.company.com`, `10.20.0.0/16` → the work Cisco;
+- `intranet.office.lan` → the office OpenVPN;
+- `claude.ai`, `Telegram.exe`, the `youtube` category → Amnezia;
+- everything else → directly.
+
+If a VPN goes down, its rules **block** traffic instead of letting it out directly.
+
+## Features
+
+- **Many VPN types:**
+  - **built in:** WireGuard, AmneziaWG (including 2.0 and the full access key of your own Amnezia server), VLESS/Reality, VMess, Trojan, Shadowsocks, Hysteria2, TUIC;
+  - **in isolated WSL containers:** Cisco AnyConnect / Secure Client (OpenConnect), GlobalProtect, Fortinet, Pulse/Ivanti, F5, OpenVPN;
+  - **in a Hyper-V virtual machine:** any original VPN app (AmneziaVPN, Cisco Secure Client, provider clients).
+- **Rules:** by program, program path, domain, domain suffix, keyword, regex, IP/subnet, site category (geosite), IP country, port and protocol. Ready-made sets (AI services, YouTube, Telegram, Discord, Meta, X), drag & drop ordering, a "where will it go?" check.
+- **DNS:** DoH, DoH3, DoT, DoQ, UDP/TCP and the system resolver; each server can go directly or **through any VPN**; per-domain DNS rules; FakeIP so that DNS never leaks.
+- **Logins:** saved passwords (encrypted with DPAPI), MFA codes, push confirmations (Duo, Telegram bots…), SAML/SSO in the browser. Corporate VPNs log in one at a time, so their push requests do not collide; idle sessions are kept alive.
+- **Import:** a `vpn://` key, `.conf`, `.ovpn`, share links, subscriptions (Happ, v2rayN, Hiddify, Clash), a whole Clash/mihomo config, or a VPNer profile.
+- **Leak test:** the real exit IP, DNS and latency of every connection.
+- **Self-healing:** stalled tunnels are rebuilt automatically, crashed parts restart.
+- **Appearance:** themes that change the whole look — Standard, **CLI / terminal** (character frames, falling characters, glitches, a decrypting screen) and **Glass** (Windows 11) — in light and dark, your own colors, fonts, radii and variables.
+- **Languages:** English and Russian; adding a language is adding one file.
+
+| | |
+|---|---|
+| ![Rules](docs/screenshots/rules-glass-en.png) | ![Appearance](docs/screenshots/appearance-cli-en.png) |
+| Rules, Glass theme | Appearance, CLI theme |
+
+## Requirements
+
+- Windows 10 or 11, 64-bit, administrator rights (to capture traffic and run the kill switch).
+- Microsoft Edge (it comes with Windows) — the window of the program is an Edge app window.
+- For Cisco/OpenVPN: WSL 2 (VPNer installs it with one click if needed).
+- For virtual machines: Windows Pro/Enterprise with Hyper-V.
+
+Everything else (the mihomo engine, the WSL container, VM images) is downloaded on first use, pinned by version and checked by SHA-256/512.
+
+## Install
+
+Download from [Releases](../../releases/latest):
+
+| File | What it is |
+|---|---|
+| `vpner-setup.exe` | Installer: choose a language and a theme, shortcuts, an entry in "Installed apps" |
+| `VPNer-portable.zip` | Portable: unpack anywhere and run `vpner.exe`; everything stays in the `data` folder next to it |
+| `SHA256SUMS.txt` | Checksums of the files |
+
+The files are not signed yet, so Windows SmartScreen may say "Windows protected your PC": click **More info → Run anyway**.
+
+Uninstall from Windows **Settings → Apps** or with `vpner.exe uninstall`; it asks whether to keep your settings.
+
+## Quick start
+
+1. Start VPNer and allow administrator rights.
+2. **Connections → Add.** Paste a key or a config — the type is detected automatically.
+3. **Rules.** Add programs, sites or subnets and choose a connection for each.
+4. Click **Turn on**.
+
+Do not run other VPN apps in Windows at the same time — they take over the routes again. Move them into VPNer (a key or a config) or into a VPNer virtual machine.
+
+## How it works
 
 ```
- Программы Windows ──► адаптер VPNer (TUN) ──► движок правил (mihomo)
+ Windows programs ──► VPNer adapter (TUN) ──► rule engine (mihomo)
                                                   │
         ┌─────────────────────────────┬───────────┴───────────────┬──────────────────────┐
         ▼                             ▼                           ▼                      ▼
-  Встроенные протоколы       Контейнер WSL (netns)        Виртуалка Hyper-V        Напрямую / блок
-  WireGuard, AmneziaWG,      Cisco AnyConnect/OpenConnect,  оригинальные программы:
-  VLESS/Reality, VMess,      GlobalProtect, Fortinet,       AmneziaVPN, Cisco Secure
-  Trojan, SS, Hysteria2      Pulse, F5, OpenVPN             Client, клиенты провайдеров
+  Built-in protocols         WSL container (netns)        Hyper-V virtual machine   Direct / block
+  WireGuard, AmneziaWG,      Cisco/OpenConnect,           original apps:
+  VLESS/Reality, VMess,      GlobalProtect, Fortinet,     AmneziaVPN, Cisco Secure
+  Trojan, SS, Hysteria2      Pulse, F5, OpenVPN           Client, provider clients
 ```
 
-* **Встроенные** протоколы работают прямо в движке, без отдельных программ.
-* **Контейнер WSL.** Каждый VPN получает свой сетевой namespace. В нём нет ни одного сетевого выхода, кроме собственного туннеля. До своего сервера VPN-демон доходит только через агент VPNer. Связь с Windows идёт через stdio процесса `wsl.exe`, поэтому сетевой режим WSL, брандмауэры и чужие kill-switch на неё не влияют.
-* **Виртуалка Hyper-V** создаётся автоматически: Debian 13, рабочий стол и Firefox. Вы ставите туда свою VPN-программу. Шлюз внутри ВМ может отправлять трафик только через туннель этой программы (ограничение на nftables по пользователю шлюза).
+- **Built-in** tunnels run in a separate engine process that never reloads when rules change.
+- **WSL containers:** every VPN gets its own network namespace whose only way out is its own tunnel. The daemons reach their servers through the VPNer agent over the stdio of `wsl.exe`, so WSL networking modes, firewalls and other kill switches do not matter.
+- **Virtual machines** (Debian 13 with a desktop) are created automatically; the gateway inside can send traffic only through the VPN app's tunnel (nftables).
 
-## Защита от утечек
+### Leak protection
 
-| Риск | Что делает VPNer |
+| Risk | What VPNer does |
 |---|---|
-| Трафик одного VPN уходит через другой | VPN изолированы: namespace или ВМ |
-| VPN упал, и трафик пошёл напрямую | Правило, которое ведёт в неработающий VPN, **блокирует** трафик, а не отправляет его напрямую |
-| DNS-утечка | DNS перехватывается, FakeIP. Имена для VPN разрешаются внутри своего туннеля |
-| Программа игнорирует прокси | TUN перехватывает весь IP-трафик компьютера |
-| IPv6 в обход | IPv6 идёт через те же правила. В контейнерах IPv6 отключён |
-| Падение самой программы | Системный kill-switch (Брандмауэр Windows) блокирует интернет |
-| Неуверенность | Вкладка «Проверка утечек» показывает реальный выходной IP каждого подключения |
+| One VPN's traffic goes through another | VPNs are isolated in namespaces or VMs |
+| A VPN dropped and traffic went out directly | Rules leading to a VPN that is down **block** traffic |
+| DNS leaks | DNS is captured, FakeIP; names for a VPN are resolved inside its tunnel |
+| A program ignores proxies | TUN captures all IP traffic of the computer |
+| IPv6 around the tunnel | IPv6 follows the same rules; it is off inside containers |
+| VPNer itself crashes | The system kill switch (Windows Firewall) blocks the internet |
+| Not sure | The **Leak test** tab shows the real exit IP of every connection |
 
-## Быстрый старт
+## If the internet is gone
 
-1. Запустите `vpner.exe`. Программа сама запросит права администратора: они нужны для перехвата трафика.
-2. **Подключения → Добавить.** Вставьте ключ `vpn://` из AmneziaVPN, конфиг `.conf` или `.ovpn` либо ссылку `vless://`. Тип определится сам. Для Cisco/Fortinet/GlobalProtect выберите «Cisco AnyConnect / OpenConnect». Для оригинальной программы выберите «Виртуалка для VPN-программы».
-3. **Правила.** Например: `chrome.exe` через VPN A, `*.company.com` и `10.0.0.0/8` через Cisco, `youtube` (категория сайтов) через Amnezia. Всё остальное напрямую.
-4. Нажмите **Включить**.
-
-Все зависимости ставятся автоматически при первой необходимости, каждая закреплена по версии и проверяется по SHA-256/512:
-
-* mihomo (движок маршрутизации) скачивается при первом включении;
-* контейнер WSL (Alpine + openconnect/openvpn) создаётся при первом подключении Cisco/OpenVPN. Если WSL не установлен, в настройках есть кнопка «Установить WSL»;
-* образ Debian для виртуалок скачивается при создании первой ВМ. Если Hyper-V выключен, в настройках есть кнопка «Включить Hyper-V».
-
-Файлы, которые не удалось скачать, можно положить вручную в `%LOCALAPPDATA%\VPNer\downloads`: программа проверит контрольную сумму и использует их.
-
-**Не запускайте одновременно** старые VPN-программы на самом Windows: они снова начнут бороться за маршруты. Перенесите их в VPNer (ключ или конфиг) или в виртуалку.
-
-## Пароли и мультифактор (MFA)
-
-* **Коды** (SMS, TOTP, «Response:», static/dynamic challenge OpenVPN): программа показывает окно с запросом и передаёт ответ в VPN. Если окно VPNer закрыто, оно откроется само.
-* **Push-подтверждение** (Duo, Microsoft Authenticator): подтвердите вход на телефоне, VPN ждёт. На запрос «second password» обычно вводят `push`.
-* **Вход через браузер** (SAML/SSO): для Cisco включите «Вход через браузер», страница организации откроется в вашем браузере.
-* **Пароль** можно не сохранять: программа спросит его при подключении. Сохранённые пароли зашифрованы (DPAPI), а VPN-клиенту передаются только в памяти, без временных файлов. Конфиги с ключами на время подключения лежат во временной папке контейнера и удаляются при отключении.
-
-## DNS
-
-Вкладка **DNS** работает как YogaDNS:
-
-* **серверы любых протоколов:** DoH, DoH3 (HTTP/3), DoT, DoQ, обычный UDP/TCP, системный. Есть готовый список: Cloudflare, Google, Quad9, AdGuard (с блокировкой рекламы), Яндекс, Comss;
-* **маршрут для каждого сервера:** «напрямую» или **через любое VPN-подключение**, чтобы провайдер не видел даже DNS-запросы;
-* **правила DNS:** домены и категории сайтов на конкретный сервер. Например, `company.local` через корпоративный DNS, `category-ads-all` через AdGuard;
-* **режим:** FakeIP (по умолчанию, без утечек) или настоящие IP;
-* **проверка** «как разрешится имя».
-
-Эти настройки касаются прямого трафика и правил DNS. Трафик, который идёт в VPN, всегда разрешается DNS-сервером этого VPN внутри туннеля.
-
-## Импорт и перенос настроек
-
-В окне «Добавить» можно вставить или перетащить:
-
-* **один ключ или конфиг**: `vpn://`, `.conf`, `.ovpn`, `vless://` и т.п.;
-* **сразу много ссылок**, по одной на строку, или **несколько файлов** одновременно;
-* **конфиг Clash / mihomo (YAML)**. Переносятся все прокси и правила, группы заменяются на конкретное подключение;
-* **ссылку подписки** провайдера (та же, что для Happ, v2rayN, Hiddify, Clash). Обёртки вида `happ://add/…` и `clash://install-config?url=…` разворачиваются автоматически. Зашифрованные `happ://crypt…` открывает только сам Happ, для них нужна обычная `https://` ссылка от провайдера.
-
-Перед импортом показывается сводка: сколько подключений и правил добавится, заменять ли свои правила, что не удалось перенести.
-
-**Профиль VPNer** (Настройки → Профиль) хранит все подключения, правила и настройки одним файлом: для бэкапа и переноса на другой компьютер. Пароли и ключи попадают в файл только по отдельной галочке.
-
-**Happ на том же компьютере:**
-
-* в режиме TUN/VPN он будет конфликтовать с VPNer так же, как любой другой VPN;
-* в режиме прокси (локальный порт, например `127.0.0.1:10808`) его можно добавить как «Внешний прокси». Тогда добавьте правило «программа `Happ.exe` → Напрямую», чтобы сам Happ ходил к своим серверам мимо других VPN;
-* проще всего импортировать его подписку прямо в VPNer.
-
-## Если пропал интернет
-
-Включённый kill-switch держит интернет закрытым, пока VPNer не работает. Снять его можно тремя способами:
-
-* значок в трее → «Аварийно восстановить сеть»;
-* Настройки → «Аварийно восстановить сеть»;
-* из командной строки:
+With the kill switch on, the internet stays closed while VPNer is not running. To lift it: tray icon → **Restore the network**, **Settings → Maintenance**, or:
 
 ```bash
 vpner.exe restore
 ```
 
-## Сборка
+## Build from source
 
 ```bash
 powershell -ExecutionPolicy Bypass -File build.ps1
 ```
 
-Скрипт сам скачает Go в `.tools`, соберёт Linux-агент (amd64 и arm64), встроит его в `vpner.exe` и положит результат в `dist\`. Для ARM-Windows используйте `-Arch arm64` или `-Arch all`.
+The script downloads a pinned Go toolchain into `.tools`, builds the Linux agent (amd64 and arm64), embeds it into `vpner.exe` and puts `vpner.exe`, `vpner-setup.exe` and `VPNer-portable.zip` into `dist\`. Use `-Arch arm64` or `-Arch all` for ARM Windows. See [CONTRIBUTING.md](CONTRIBUTING.md) for tests, the project layout and translations.
 
-## Структура
+## Limitations
 
-| Путь | Что там |
-|---|---|
-| `cmd/vpner` | приложение Windows: трей, окно, CLI |
-| `cmd/vpner-agent` | агент для WSL и шлюз внутри ВМ (Linux) |
-| `internal/providers` | типы подключений как плагины. Новый тип = один файл с `Register(...)` |
-| `internal/engine` | генерация конфига и управление mihomo |
-| `internal/agent` | namespace, запуск VPN-демонов, DNS внутри туннеля, шлюз ВМ |
-| `internal/bridge`, `internal/wslhost` | протокол и мост Windows ↔ WSL поверх stdio |
-| `internal/hyperv` | создание ВМ, образ, cloud-init, nftables kill-switch |
-| `internal/firewall` | системный kill-switch |
-| `internal/web` | интерфейс (одна страница) и API |
+- OpenConnect runs over TLS without DTLS (UDP does not go through the uplink); for corporate access this is usually enough.
+- Cisco servers that require HostScan/posture checks need the original client in a virtual machine.
+- Virtual machines need Windows Pro/Enterprise with Hyper-V; their first setup takes 10–15 minutes.
 
-Данные хранятся в `%LOCALAPPDATA%\VPNer`. Пароли и ключи зашифрованы DPAPI под вашей учётной записью. Портативный режим: папка `data` рядом с `vpner.exe`.
+## Project status
 
-## Ограничения
+> [!IMPORTANT]
+> **This project is entirely vibe-coded.** Every line of it was written by **Claude Opus 5.5** (Anthropic) in Claude Code, directed by the author. It works on the author's machine every day, but it is an early beta that has not been audited. Test it before you rely on it, especially the leak protection.
 
-* Подключения через openconnect идут по TLS без DTLS, так как UDP не проходит через аплинк. Для корпоративного доступа этого обычно хватает.
-* Если сервер Cisco требует проверку рабочего места (HostScan/posture), используйте оригинальный клиент в виртуалке.
-* Виртуалкам нужна Windows Pro/Enterprise с Hyper-V. Первая настройка ВМ занимает 10–15 минут.
+Found a bug or have an idea? Open an [issue](../../issues/new/choose) or write to **jackjackjackjack024@gmail.com**. Security problems: see [SECURITY.md](SECURITY.md).
+
+There is no license yet: the code is published for review and testing. Ask the author before reusing it.

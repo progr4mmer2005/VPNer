@@ -26,9 +26,9 @@ import (
 
 // GatewayConfig is written by cloud-init into a VPN virtual machine.
 type GatewayConfig struct {
-	Listen      string   `json:"listen"`      // lan IP of the VM
-	HostIP      string   `json:"hostIp"`      // the only peer allowed
-	User        string   `json:"user"`        // SOCKS5 / status credentials
+	Listen      string   `json:"listen"` // lan IP of the VM
+	HostIP      string   `json:"hostIp"` // the only peer allowed
+	User        string   `json:"user"`   // SOCKS5 / status credentials
 	Pass        string   `json:"pass"`
 	FallbackDNS []string `json:"fallbackDns"` // used when the VPN app sets no DNS
 	ShareDir    string   `json:"shareDir"`
@@ -38,12 +38,12 @@ type GatewayConfig struct {
 
 // GatewayStatus is served to the host.
 type GatewayStatus struct {
-	Version   string   `json:"version"`
-	Tunnels   []Tunnel `json:"tunnels"`
-	DefaultVia string  `json:"defaultVia"`
-	DNS       []string `json:"dns"`
-	Provision string   `json:"provision"` // running|done|error
-	Uptime    int64    `json:"uptime"`
+	Version    string   `json:"version"`
+	Tunnels    []Tunnel `json:"tunnels"`
+	DefaultVia string   `json:"defaultVia"`
+	DNS        []string `json:"dns"`
+	Provision  string   `json:"provision"` // running|done|error
+	Uptime     int64    `json:"uptime"`
 }
 
 type Tunnel struct {

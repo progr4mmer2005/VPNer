@@ -15,8 +15,10 @@ type amneziaServerProvider struct{}
 
 func init() { Register(amneziaServerProvider{}) }
 
-func (amneziaServerProvider) Type() string     { return "amnezia-server" }
-func (amneziaServerProvider) Title() string    { return "Amnezia — ключ полного доступа" }
+func (amneziaServerProvider) Type() string { return "amnezia-server" }
+func (amneziaServerProvider) Title() string {
+	return "Amnezia — ключ полного доступа"
+}
 func (amneziaServerProvider) Runtime() Runtime { return RuntimeNative }
 func (amneziaServerProvider) Description() string {
 	return "Ключ полного доступа к вашему серверу AmneziaVPN. VPNer сам создаст на сервере отдельного пользователя со своими ключами (он появится в приложении AmneziaVPN) и подключится как встроенный AmneziaWG."

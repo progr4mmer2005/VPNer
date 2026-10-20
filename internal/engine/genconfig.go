@@ -195,10 +195,10 @@ func Generate(in GenInput) (map[string]any, error) {
 		"geo-auto-update":     true,
 		"geo-update-interval": 72,
 		"profile":             map[string]any{"store-selected": false, "store-fake-ip": true},
-		"dns":       dnsSection,
-		"proxies":   proxies,
-		"listeners": listeners,
-		"rules":     rules,
+		"dns":                 dnsSection,
+		"proxies":             proxies,
+		"listeners":           listeners,
+		"rules":               rules,
 	}
 	dnsSection["fake-ip-filter"] = fakeFilter
 	if !s.NoTun {

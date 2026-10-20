@@ -159,7 +159,9 @@ func (a *App) vmConnect(id string, p VMRuntime) error {
 	a.vms[id] = rt
 	a.vmEndpoints[id] = engine.LocalEndpoint{Server: rt.ip, Port: 1080, User: rt.user, Pass: rt.pass, Iface: hyperv.LANAlias}
 	a.mu.Unlock()
-	a.setConn(id, func(r *connRuntime) { r.State, r.Detail = "provisioning", "виртуальная машина запускается" })
+	a.setConn(id, func(r *connRuntime) {
+		r.State, r.Detail = "provisioning", "виртуальная машина запускается"
+	})
 	a.Log.Infof(id, "виртуальная машина %s запущена, адрес шлюза %s", spec.VMName, rt.ip)
 	go a.watchVM(id, rt)
 	return a.applyEngine()

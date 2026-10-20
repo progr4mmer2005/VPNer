@@ -154,7 +154,9 @@ func knownFolder(id *windows.KNOWNFOLDERID) string {
 func startMenuLink() string {
 	return filepath.Join(knownFolder(windows.FOLDERID_CommonPrograms), AppName+".lnk")
 }
-func desktopLink() string { return filepath.Join(knownFolder(windows.FOLDERID_Desktop), AppName+".lnk") }
+func desktopLink() string {
+	return filepath.Join(knownFolder(windows.FOLDERID_Desktop), AppName+".lnk")
+}
 
 func psq(s string) string { return "'" + strings.ReplaceAll(s, "'", "''") + "'" }
 

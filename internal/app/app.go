@@ -39,27 +39,27 @@ type App struct {
 
 	ops sync.Mutex // serialises lifecycle operations
 
-	mu        sync.Mutex
-	cfg       *config.Config
-	running   bool
-	starting  bool
-	lastError string
-	setup     *SetupState
-	engine    *engine.Mihomo
-	tun       *tunnelProc // WireGuard/AmneziaWG tunnels, see tunnels.go
-	tunMu     sync.Mutex  // serialises syncTunnels
-	wsl       *wslhost.Session
-	wslReady  bool
-	endpoints map[string]*endpoint
+	mu          sync.Mutex
+	cfg         *config.Config
+	running     bool
+	starting    bool
+	lastError   string
+	setup       *SetupState
+	engine      *engine.Mihomo
+	tun         *tunnelProc // WireGuard/AmneziaWG tunnels, see tunnels.go
+	tunMu       sync.Mutex  // serialises syncTunnels
+	wsl         *wslhost.Session
+	wslReady    bool
+	endpoints   map[string]*endpoint
 	vms         map[string]*vmRuntime
 	health      map[string]*nativeHealth
 	quitAsk     bool // the user asked to quit while VPNs were running
 	foreign     []string
 	monStop     chan struct{}
 	vmEndpoints map[string]engine.LocalEndpoint
-	testPorts map[string]int
-	conns     map[string]*connRuntime
-	ssoFwd    net.Listener
+	testPorts   map[string]int
+	conns       map[string]*connRuntime
+	ssoFwd      net.Listener
 	// typedPass holds a password the user typed at a prompt; it is saved
 	// into the connection once the tunnel comes up with it.
 	typedPass map[string]string
@@ -109,18 +109,18 @@ func New(dataDir string) (*App, error) {
 		return nil, err
 	}
 	a := &App{
-		DataDir:   dataDir,
-		Log:       NewLogger(filepath.Join(dataDir, "logs")),
-		store:     &config.Store{Path: filepath.Join(dataDir, "config.json")},
-		ks:        &firewall.KillSwitch{StateDir: dataDir},
-		endpoints: map[string]*endpoint{},
+		DataDir:     dataDir,
+		Log:         NewLogger(filepath.Join(dataDir, "logs")),
+		store:       &config.Store{Path: filepath.Join(dataDir, "config.json")},
+		ks:          &firewall.KillSwitch{StateDir: dataDir},
+		endpoints:   map[string]*endpoint{},
 		vms:         map[string]*vmRuntime{},
 		health:      map[string]*nativeHealth{},
 		vmEndpoints: map[string]engine.LocalEndpoint{},
-		testPorts: map[string]int{},
-		conns:     map[string]*connRuntime{},
-		typedPass: map[string]string{},
-		subs:      map[chan struct{}]struct{}{},
+		testPorts:   map[string]int{},
+		conns:       map[string]*connRuntime{},
+		typedPass:   map[string]string{},
+		subs:        map[chan struct{}]struct{}{},
 	}
 	cfg, err := a.store.Load()
 	if err != nil {
@@ -130,9 +130,9 @@ func New(dataDir string) (*App, error) {
 	return a, nil
 }
 
-func (a *App) binDir() string      { return filepath.Join(a.DataDir, "bin") }
-func (a *App) cacheDir() string    { return filepath.Join(a.DataDir, "downloads") }
-func (a *App) engineDir() string   { return filepath.Join(a.DataDir, "engine") }
+func (a *App) binDir() string                   { return filepath.Join(a.DataDir, "bin") }
+func (a *App) cacheDir() string                 { return filepath.Join(a.DataDir, "downloads") }
+func (a *App) engineDir() string                { return filepath.Join(a.DataDir, "engine") }
 func (a *App) KillSwitch() *firewall.KillSwitch { return a.ks }
 
 // ---- change notification for the UI ----
@@ -438,7 +438,6 @@ func (a *App) SaveSettings(s config.Settings) error {
 	}
 	return nil
 }
-
 
 // ---- lifecycle ----
 

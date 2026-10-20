@@ -33,16 +33,16 @@ type UDPSession interface {
 }
 
 type Server struct {
-	Backend  Backend
-	User     string // empty = no auth
-	Pass     string
-	Logf     func(format string, args ...any)
-	UDPBind  net.IP // address UDP relays bind to; defaults to the TCP listener's local IP
+	Backend Backend
+	User    string // empty = no auth
+	Pass    string
+	Logf    func(format string, args ...any)
+	UDPBind net.IP // address UDP relays bind to; defaults to the TCP listener's local IP
 	// ListenUDP creates the UDP relay socket (e.g. inside a network
 	// namespace); defaults to net.ListenUDP.
 	ListenUDP func(addr *net.UDPAddr) (*net.UDPConn, error)
-	listener net.Listener
-	wg       sync.WaitGroup
+	listener  net.Listener
+	wg        sync.WaitGroup
 }
 
 func (s *Server) logf(f string, a ...any) {

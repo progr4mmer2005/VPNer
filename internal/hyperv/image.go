@@ -125,9 +125,9 @@ func writeSparseVHD(r io.Reader, size int64, dst string, progress deps.Progress)
 func vhdFooter(size uint64) []byte {
 	f := make([]byte, 512)
 	copy(f[0:], "conectix")
-	binary.BigEndian.PutUint32(f[8:], 2)                     // features: reserved bit
-	binary.BigEndian.PutUint32(f[12:], 0x00010000)           // format version
-	binary.BigEndian.PutUint64(f[16:], 0xFFFFFFFFFFFFFFFF)   // data offset: none (fixed)
+	binary.BigEndian.PutUint32(f[8:], 2)                   // features: reserved bit
+	binary.BigEndian.PutUint32(f[12:], 0x00010000)         // format version
+	binary.BigEndian.PutUint64(f[16:], 0xFFFFFFFFFFFFFFFF) // data offset: none (fixed)
 	ts := time.Since(time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)).Seconds()
 	binary.BigEndian.PutUint32(f[24:], uint32(ts))
 	copy(f[28:], "vpnr")

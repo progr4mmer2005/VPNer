@@ -56,7 +56,9 @@ type setup struct {
 
 func (st *setup) exit() { st.quitOnce.Do(func() { close(st.quit) }) }
 
-func store() *config.Store { return &config.Store{Path: filepath.Join(install.DataDir(), "config.json")} }
+func store() *config.Store {
+	return &config.Store{Path: filepath.Join(install.DataDir(), "config.json")}
+}
 
 func main() {
 	if !winutil.IsAdmin() {

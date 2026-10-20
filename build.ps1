@@ -75,6 +75,18 @@ foreach ($a in $targets) {
     if ($LASTEXITCODE) { throw 'setup build failed' }
     Remove-Item cmd\vpner-setup\payload\vpner.exe.gz
     Write-Host ("  -> {0} ({1:N1} MB)" -f $setup, ((Get-Item $setup).Length / 1MB))
+
+    # 4. Portable zip: the program and a "data" folder next to it, so all
+    #    settings stay in that folder (see dataDir in cmd/vpner)
+    $zip = if ($targets.Count -gt 1) { "dist\VPNer-portable-$a.zip" } else { 'dist\VPNer-portable.zip' }
+    $stage = "build\portable-$a\VPNer"
+    Remove-Item -Recurse -Force "build\portable-$a" -ErrorAction SilentlyContinue
+    New-Item -ItemType Directory -Force "$stage\data" | Out-Null
+    Copy-Item $out "$stage\vpner.exe"
+    Copy-Item packaging\portable-data-README.txt "$stage\data\README.txt"
+    Remove-Item $zip -ErrorAction SilentlyContinue
+    Compress-Archive -Path $stage -DestinationPath $zip
+    Write-Host ("  -> {0} ({1:N1} MB)" -f $zip, ((Get-Item $zip).Length / 1MB))
 }
 Remove-Item Env:GOOS, Env:GOARCH
 Write-Host 'Done.'

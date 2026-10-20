@@ -12,6 +12,8 @@
 package hyperv
 
 import (
+	"vpner/internal/i18n"
+
 	"crypto/rand"
 	"errors"
 	"fmt"
@@ -62,9 +64,9 @@ func Available() error {
 	case "ok":
 		return nil
 	case "nomodule":
-		return errors.New("Hyper-V не включён. Нажмите «Включить Hyper-V» в настройках (нужна Windows Pro/Enterprise и перезагрузка)")
+		return errors.New(i18n.T("hyperv.hyperVIsNotEnabled"))
 	default:
-		return errors.New("служба Hyper-V (vmms) не запущена — перезагрузите компьютер после включения Hyper-V")
+		return errors.New(i18n.T("hyperv.hyperVServiceVmmsIs"))
 	}
 }
 
@@ -85,7 +87,7 @@ if (-not (Get-NetIPAddress -InterfaceIndex $if.ifIndex -IPAddress %[3]s -ErrorAc
 try { Set-NetConnectionProfile -InterfaceIndex $if.ifIndex -NetworkCategory Private } catch {}
 `, q(LANSwitch), q(LANAlias), q(LANHost)))
 	if err != nil {
-		return fmt.Errorf("внутренняя сеть VPNer-LAN: %w", err)
+		return fmt.Errorf(i18n.T("hyperv.internalNetworkVpnerLan"), err)
 	}
 	return nil
 }
@@ -101,17 +103,17 @@ func EnsureWAN(logf func(string)) (string, error) {
 		return name, nil
 	}
 	if logf != nil {
-		logf("создаю внешний коммутатор Hyper-V для выхода виртуалок в интернет (сеть на пару секунд пропадёт)")
+		logf(i18n.T("hyperv.creatingExternalHyperVSwitch"))
 	}
 	out, err := ps(fmt.Sprintf(`
 $a = Get-NetAdapter -Physical | Where-Object { $_.Status -eq 'Up' } | Where-Object { Get-NetIPConfiguration -InterfaceIndex $_.ifIndex | Where-Object { $_.IPv4DefaultGateway } } | Sort-Object { $_.MediaType -ne '802.3' } | Select-Object -First 1
 if (-not $a) { 'none' } else { New-VMSwitch -Name %s -NetAdapterName $a.Name -AllowManagementOS $true | Out-Null; 'ok' }`, q(WANSwitch)))
 	if err != nil {
-		return "", fmt.Errorf("внешний коммутатор: %w", err)
+		return "", fmt.Errorf(i18n.T("hyperv.externalSwitch"), err)
 	}
 	if out == "none" {
 		if logf != nil {
-			logf("подходящий физический адаптер не найден — виртуалки будут выходить через Default Switch (NAT)")
+			logf(i18n.T("hyperv.noSuitablePhysicalAdapterFound"))
 		}
 		return "Default Switch", nil
 	}
@@ -170,7 +172,7 @@ Add-VMHardDiskDrive -VMName $name -ControllerType IDE -ControllerNumber 0 -Contr
 Enable-VMIntegrationService -VMName $name -Name 'Guest Service Interface' -ErrorAction SilentlyContinue
 `, q(c.Name), q(c.Dir), q(base), q(c.SeedDir), c.DiskGB, c.MemoryMB, c.CPUs, q(c.WAN), q(c.WANMac), q(c.LANMac), q(LANSwitch)))
 	if err != nil {
-		return fmt.Errorf("создание виртуальной машины: %w", err)
+		return fmt.Errorf(i18n.T("hyperv.creatingVirtualMachine"), err)
 	}
 	return nil
 }

@@ -4,6 +4,8 @@
 package importer
 
 import (
+	"vpner/internal/i18n"
+
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -68,7 +70,7 @@ func (r *Result) Summary() Summary {
 func Parse(filename, data string) (*Result, error) {
 	data = strings.TrimSpace(strings.TrimPrefix(data, "\uFEFF"))
 	if data == "" {
-		return nil, errors.New("пусто")
+		return nil, errors.New(i18n.T("importer.empty"))
 	}
 	// VPNer profile
 	if strings.HasPrefix(data, "{") {
@@ -139,7 +141,7 @@ func parseList(items []string) (*Result, error) {
 	for i, it := range items {
 		c, err := providers.Import("", it)
 		if err != nil {
-			res.Notes = append(res.Notes, fmt.Sprintf("строка %d пропущена: %v", i+1, err))
+			res.Notes = append(res.Notes, fmt.Sprintf(i18n.T("importer.lineSkipped"), i+1, err))
 			continue
 		}
 		c.ID = config.NewID("c")
@@ -147,14 +149,14 @@ func parseList(items []string) (*Result, error) {
 		res.Connections = append(res.Connections, *c)
 	}
 	if len(res.Connections) == 0 {
-		return nil, errors.New("ни одну ссылку не удалось распознать: " + strings.Join(res.Notes, "; "))
+		return nil, fmt.Errorf(i18n.T("importer.noLinkCouldBeRecognized"), strings.Join(res.Notes, "; "))
 	}
 	return res, nil
 }
 
 func uniqueName(seen map[string]int, name string) string {
 	if name == "" {
-		name = "Подключение"
+		name = i18n.T("importer.connection")
 	}
 	seen[name]++
 	if seen[name] == 1 {
@@ -168,16 +170,16 @@ func uniqueName(seen map[string]int, name string) string {
 func parseProfile(data string) (*Result, error) {
 	var p Profile
 	if err := json.Unmarshal([]byte(data), &p); err != nil {
-		return nil, fmt.Errorf("файл профиля повреждён: %v", err)
+		return nil, fmt.Errorf(i18n.T("importer.profileFileIsDamaged"), err)
 	}
 	if p.VPNer > ProfileVersion {
-		return nil, fmt.Errorf("профиль создан более новой версией VPNer (формат %d)", p.VPNer)
+		return nil, fmt.Errorf(i18n.T("importer.profileWasCreatedByNewer"), p.VPNer)
 	}
 	res := &Result{Kind: "profile", Settings: p.Settings}
 	idMap := map[string]string{}
 	for _, c := range p.Connections {
 		if _, err := providers.Get(c.Type); err != nil {
-			res.Notes = append(res.Notes, fmt.Sprintf("«%s»: тип %s не поддерживается — пропущено", c.Name, c.Type))
+			res.Notes = append(res.Notes, fmt.Sprintf(i18n.T("importer.typeIsNotSupportedSkipped"), c.Name, c.Type))
 			continue
 		}
 		nid := config.NewID("c")
@@ -269,7 +271,7 @@ func parseProfile(data string) (*Result, error) {
 		}
 	}
 	if missing > 0 {
-		res.Notes = append(res.Notes, fmt.Sprintf("профиль без паролей и ключей: у %d подключений их нужно будет ввести заново", missing))
+		res.Notes = append(res.Notes, fmt.Sprintf(i18n.T("importer.profileHasNoPasswordsOr"), missing))
 	}
 	return res, nil
 }
@@ -354,14 +356,14 @@ func parseClash(data string) (*Result, error) {
 		c := config.Connection{ID: config.NewID("c"), Name: uniqueName(names, name), Type: "mihomo", Enabled: true,
 			Params: map[string]string{}, Secrets: map[string]string{"yaml": string(y)}}
 		if err := providers.Validate(&c); err != nil {
-			res.Notes = append(res.Notes, fmt.Sprintf("«%s» пропущено: %v", name, err))
+			res.Notes = append(res.Notes, fmt.Sprintf(i18n.T("importer.skipped"), name, err))
 			continue
 		}
 		byName[name] = c.ID
 		res.Connections = append(res.Connections, c)
 	}
 	if len(res.Connections) == 0 {
-		return nil, errors.New("в конфиге нет поддерживаемых прокси")
+		return nil, errors.New(i18n.T("importer.configHasNoSupportedProxies"))
 	}
 	// groups: resolve to their first concrete member (VPNer routes rules to
 	// one connection; failover groups would hide outages from the user)
@@ -394,7 +396,7 @@ func parseClash(data string) (*Result, error) {
 		t := resolve(name, 0)
 		if _, isGroup := groups[name]; isGroup && !groupNotes[name] {
 			groupNotes[name] = true
-			res.Notes = append(res.Notes, fmt.Sprintf("группа «%s» → %s", name, displayTarget(t, res.Connections)))
+			res.Notes = append(res.Notes, fmt.Sprintf(i18n.T("importer.group"), name, displayTarget(t, res.Connections)))
 		}
 		if t == "" {
 			return config.TargetBlock
@@ -438,7 +440,7 @@ func parseClash(data string) (*Result, error) {
 			kinds = append(kinds, fmt.Sprintf("%s ×%d", k, n))
 		}
 		sort.Strings(kinds)
-		res.Notes = append(res.Notes, "не перенесены правила: "+strings.Join(kinds, ", "))
+		res.Notes = append(res.Notes, fmt.Sprintf(i18n.T("importer.rulesNotCarriedOver"), strings.Join(kinds, ", ")))
 	}
 	return res, nil
 }
@@ -446,9 +448,9 @@ func parseClash(data string) (*Result, error) {
 func displayTarget(t string, conns []config.Connection) string {
 	switch t {
 	case config.TargetDirect:
-		return "напрямую"
+		return i18n.T("importer.direct")
 	case config.TargetBlock, "":
-		return "блокировать"
+		return i18n.T("importer.block")
 	}
 	for _, c := range conns {
 		if c.ID == t {

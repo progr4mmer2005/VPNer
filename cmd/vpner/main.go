@@ -5,6 +5,8 @@
 package main
 
 import (
+	"vpner/internal/i18n"
+
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -73,7 +75,7 @@ func main() {
 		return
 	case "help", "/?":
 		winutil.AttachParentConsole()
-		fmt.Println("vpner.exe            запустить программу (окно + значок в трее)\nvpner.exe --tray     запустить свёрнутой в трей\nvpner.exe restore    аварийно восстановить сеть (снять kill-switch)\nvpner.exe uninstall  удалить программу\nvpner.exe version")
+		fmt.Println(i18n.T("main.vpnerExeStartProgramWindow"))
 		return
 	}
 
@@ -81,21 +83,21 @@ func main() {
 	// switch will not work without administrator rights).
 	if !winutil.IsAdmin() && os.Getenv("VPNER_DEV") != "1" {
 		if err := winutil.RelaunchElevated(args); err != nil {
-			fatal("Нужны права администратора (для перехвата трафика и защиты от утечек).\n" + err.Error())
+			fatal(fmt.Sprintf(i18n.T("main.administratorRightsAreNeededTo"), err))
 		}
 		return
 	}
 
 	dir := dataDir()
 	if cmd == "uninstall" {
-		if !winutil.Ask("Удаление VPNer", "Удалить VPNer с этого компьютера?\n\nВсе VPN-подключения будут отключены, сеть вернётся в обычный режим.") {
+		if !winutil.Ask(i18n.T("main.uninstallVpner"), i18n.T("main.removeVpnerFromThisComputer")) {
 			return
 		}
-		removeData := winutil.Ask("Удаление VPNer", "Удалить также настройки, подключения, сохранённые пароли и контейнер WSL?\n\n«Нет» — они останутся, и при повторной установке всё будет на месте.")
+		removeData := winutil.Ask(i18n.T("main.uninstallVpner"), i18n.T("main.alsoDeleteSettingsConnectionsSaved"))
 		if err := install.Uninstall(removeData); err != nil {
-			fatal("Не удалось удалить VPNer: " + err.Error())
+			fatal(fmt.Sprintf(i18n.T("main.couldNotUninstallVpner"), err))
 		}
-		winutil.MessageBox("VPNer", "VPNer удалён.", false)
+		winutil.MessageBox("VPNer", i18n.T("main.vpnerHasBeenRemoved"), false)
 		return
 	}
 	if cmd == "restore" {
@@ -104,7 +106,7 @@ func main() {
 		if err := ks.Disable(); err != nil {
 			fatal(err.Error())
 		}
-		fmt.Println("Сеть восстановлена: kill-switch снят.")
+		fmt.Println(i18n.T("main.networkRestoredKillSwitchIs"))
 		return
 	}
 
@@ -126,18 +128,18 @@ func main() {
 	if err != nil {
 		fatal(err.Error())
 	}
-	a.Log.Infof("app", "VPNer %s запущен, данные: %s", version, dir)
+	a.Log.Infof("app", i18n.T("main.vpnerStartedData"), version, dir)
 	cfg := a.Config()
 	if a.KillSwitch().Active() && !cfg.Settings.StartOnLaunch {
 		a.KillSwitch().Disable()
-		a.Log.Warnf("app", "kill-switch остался после аварийного завершения — снят")
+		a.Log.Warnf("app", "%s", i18n.T("main.killSwitchWasLeftAfter"))
 	}
 
 	tok := make([]byte, 24)
 	rand.Read(tok)
 	srv := &web.Server{App: a, Token: hex.EncodeToString(tok)}
 	if err := srv.Start(cfg.Settings.UIPort); err != nil {
-		fatal("Не удалось запустить интерфейс: " + err.Error())
+		fatal(fmt.Sprintf(i18n.T("main.couldNotStartInterface"), err))
 	}
 	ui, _ := json.Marshal(uiInfo{Port: srv.Port, Token: srv.Token})
 	os.WriteFile(uiFile, ui, 0o600)
@@ -145,7 +147,7 @@ func main() {
 	var quitOnce sync.Once
 	quit := func() {
 		quitOnce.Do(func() {
-			a.Log.Infof("app", "выход")
+			a.Log.Infof("app", "%s", i18n.T("main.quit"))
 			a.Shutdown()
 			winutil.CloseAppWindows(winutil.AppWindowTitle)
 			srv.Close()
@@ -158,7 +160,7 @@ func main() {
 	// A VPN asking for input or waiting for a login confirmation must not
 	// wait unseen: notify and bring the window up.
 	a.OnAttention = func(id, name, text string) {
-		winutil.Notify("VPNer — "+name, "Подключение "+text)
+		winutil.Notify("VPNer — "+name, fmt.Sprintf(i18n.T("main.connection"), text))
 		if srv.Clients() == 0 {
 			openUI()
 		}
@@ -167,7 +169,7 @@ func main() {
 	if cfg.Settings.StartOnLaunch {
 		go func() {
 			if err := a.Start(); err != nil {
-				a.Log.Errorf("app", "запуск маршрутизации: %v", err)
+				a.Log.Errorf("app", i18n.T("main.startingRouting"), err)
 			}
 		}()
 	}
@@ -179,34 +181,34 @@ func main() {
 		systray.SetIcon(winutil.Icon("off"))
 		systray.SetTitle("VPNer")
 		systray.SetTooltip("VPNer")
-		mOpen := systray.AddMenuItem("Открыть VPNer", "")
-		mToggle := systray.AddMenuItem("Включить маршрутизацию", "")
+		mOpen := systray.AddMenuItem(i18n.T("main.openVpner"), "")
+		mToggle := systray.AddMenuItem(i18n.T("main.turnRoutingOn"), "")
 		systray.AddSeparator()
-		mRestore := systray.AddMenuItem("Аварийно восстановить сеть", "Выключить всё и снять kill-switch")
-		mQuit := systray.AddMenuItem("Выход", "")
+		mRestore := systray.AddMenuItem(i18n.T("main.restoreNetworkEmergency"), i18n.T("main.turnEverythingOffAndRemove"))
+		mQuit := systray.AddMenuItem(i18n.T("main.quit2"), "")
 		systray.SetOnTapped(openUI)
 
 		update := func() {
 			s := a.Snapshot()
-			icon, tip := "off", "VPNer — выключен"
+			icon, tip := "off", i18n.T("main.vpnerOff")
 			if s.Running {
-				icon, tip = "on", "VPNer — маршрутизация включена"
+				icon, tip = "on", i18n.T("main.vpnerRoutingIsOn")
 				for _, c := range s.Connections {
 					switch c.State {
 					case "down", "failed":
-						icon, tip = "warn", "VPNer — есть проблемы с подключениями"
+						icon, tip = "warn", i18n.T("main.vpnerSomeConnectionsHaveProblems")
 					case "auth", "confirm", "queued":
 						if icon != "warn" {
-							icon, tip = "warn", "VPNer — подключения ждут подтверждения входа"
+							icon, tip = "warn", i18n.T("main.vpnerConnectionsAreWaitingFor")
 						}
 					}
 				}
-				mToggle.SetTitle("Выключить маршрутизацию")
+				mToggle.SetTitle(i18n.T("main.turnRoutingOff"))
 			} else {
-				mToggle.SetTitle("Включить маршрутизацию")
+				mToggle.SetTitle(i18n.T("main.turnRoutingOn"))
 			}
 			if s.Starting {
-				icon, tip = "warn", "VPNer — запуск…"
+				icon, tip = "warn", i18n.T("main.vpnerStarting")
 			}
 			systray.SetIcon(winutil.Icon(icon))
 			systray.SetTooltip(tip)

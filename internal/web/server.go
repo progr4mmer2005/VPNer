@@ -4,6 +4,9 @@
 package web
 
 import (
+	"errors"
+	"vpner/internal/i18n"
+
 	"bytes"
 	"context"
 	"crypto/subtle"
@@ -122,7 +125,21 @@ type connDTO struct {
 
 // page is the UI with the saved theme already in it, so the window opens
 // in its look instead of flashing the standard one first.
-func (s *Server) page() []byte { return Page(s.App.Config().Appearance, "") }
+func (s *Server) page() []byte { return Page(s.App.Config().Appearance, LangScript()) }
+
+// LangScript tells the page its language and texts (window.VPNER_I18N).
+func LangScript() string {
+	type lang struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+	}
+	var langs []lang
+	for _, l := range i18n.Languages() {
+		langs = append(langs, lang{l, i18n.Name(l)})
+	}
+	b, _ := json.Marshal(map[string]any{"lang": i18n.Lang(), "dict": i18n.Dict(i18n.Lang(), "ui."), "langs": langs}) // escapes <, > and &
+	return "window.VPNER_I18N = " + string(b) + ";"
+}
 
 // CSP is the content security policy of the UI page.
 const CSP = "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data:"
@@ -221,7 +238,7 @@ func (s *Server) routes(mux *http.ServeMux) {
 		case "console":
 			err = s.App.OpenConsole(id)
 		default:
-			err = fmt.Errorf("неизвестное действие")
+			err = errors.New(i18n.T("web.unknownAction"))
 		}
 		if err != nil {
 			writeErr(w, err)
@@ -299,7 +316,7 @@ func (s *Server) routes(mux *http.ServeMux) {
 			return
 		}
 		name := "vpner-profile-" + time.Now().Format("2006-01-02") + ".json"
-		path, ok, err := winutil.SaveFileDialog("Сохранить профиль VPNer", name, "Профиль VPNer", "json")
+		path, ok, err := winutil.SaveFileDialog(i18n.T("web.saveVpnerProfile"), name, i18n.T("web.vpnerProfile"), "json")
 		if err != nil {
 			writeErr(w, err)
 			return

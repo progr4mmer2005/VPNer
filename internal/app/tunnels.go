@@ -1,6 +1,8 @@
 package app
 
 import (
+	"vpner/internal/i18n"
+
 	"path/filepath"
 	"time"
 
@@ -148,9 +150,9 @@ func (a *App) watchTunnels(t *tunnelProc, gen int) {
 	if !cur || t.m.Running() {
 		return
 	}
-	a.Log.Errorf("app", "процесс туннелей неожиданно завершился — перезапуск")
+	a.Log.Errorf("app", "%s", i18n.T("app.tunnelProcessExitedUnexpectedlyRestartin"))
 	if err := a.syncTunnels(true); err != nil {
-		a.Log.Errorf("app", "перезапуск туннелей: %v", err)
+		a.Log.Errorf("app", i18n.T("app.restartingTunnels"), err)
 	}
 }
 

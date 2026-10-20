@@ -1,6 +1,9 @@
 package app
 
 import (
+	"errors"
+	"vpner/internal/i18n"
+
 	"context"
 	"fmt"
 	"io"
@@ -57,7 +60,7 @@ func trace(client *http.Client, u string) (map[string]string, time.Duration, err
 		}
 	}
 	if out["ip"] == "" {
-		return nil, 0, fmt.Errorf("неожиданный ответ")
+		return nil, 0, errors.New(i18n.T("app.unexpectedAnswer"))
 	}
 	return out, time.Since(t), nil
 }
@@ -80,7 +83,7 @@ const (
 // VPN, and flags any VPN whose exit IP equals the real one.
 func (a *App) LeakTest(ctx context.Context) (*LeakReport, error) {
 	if !a.Running() {
-		return nil, fmt.Errorf("маршрутизация выключена")
+		return nil, errors.New(i18n.T("app.routingIsOff"))
 	}
 	rep := &LeakReport{Time: time.Now().Unix()}
 	probe := func(proxy string, info *ExitInfo) {
@@ -96,7 +99,7 @@ func (a *App) LeakTest(ctx context.Context) (*LeakReport, error) {
 			info.IPv6 = m6["ip"]
 		}
 	}
-	rep.Direct = ExitInfo{Target: config.TargetDirect, Name: "Без VPN (ваш реальный адрес)", Verdict: "direct"}
+	rep.Direct = ExitInfo{Target: config.TargetDirect, Name: i18n.T("app.noVpnYourRealAddress"), Verdict: "direct"}
 	probe("", &rep.Direct)
 
 	snap := a.Snapshot()
@@ -114,7 +117,7 @@ func (a *App) LeakTest(ctx context.Context) (*LeakReport, error) {
 			info := ExitInfo{Target: cv.ID, Name: cv.Name, DNS: cv.DNS, Verdict: "ok"}
 			if cv.Runtime != string(providers.RuntimeNative) && cv.State != "up" {
 				info.Verdict = "info"
-				info.Note = "не подключено — трафик по правилам для него блокируется"
+				info.Note = i18n.T("app.notConnectedTrafficOfIts")
 			} else {
 				probe(fmt.Sprintf("http://127.0.0.1:%d", cv.LocalProxy), &info)
 			}
@@ -122,13 +125,13 @@ func (a *App) LeakTest(ctx context.Context) (*LeakReport, error) {
 			if info.Verdict == "ok" && info.IP != "" {
 				if c != nil && c.Type == "interface" {
 					info.Verdict = "info"
-					info.Note = "выход через сетевой интерфейс, а не VPN"
+					info.Note = i18n.T("app.exitsThroughNetworkInterfaceNot")
 				} else if info.IP == rep.Direct.IP {
 					info.Verdict = "leak"
-					info.Note = "выходной адрес совпадает с реальным — этот «VPN» трафик не прячет"
+					info.Note = i18n.T("app.exitAddressEqualsRealOne")
 				} else if info.IPv6 != "" && info.IPv6 == rep.Direct.IPv6 {
 					info.Verdict = "leak"
-					info.Note = "IPv6 совпадает с реальным"
+					info.Note = i18n.T("app.ipv6EqualsRealOne")
 				}
 			}
 			mu.Lock()
@@ -207,7 +210,7 @@ func (a *App) CheckRoute(host, process string) RouteCheck {
 					}
 				}
 			case config.RuleGeoSite, config.RuleGeoIP:
-				notes = append(notes, fmt.Sprintf("правило %s:%s проверяется только движком", r.Kind, v))
+				notes = append(notes, fmt.Sprintf(i18n.T("app.ruleIsCheckedByEngine"), r.Kind, v))
 			}
 			if hit {
 				return RouteCheck{Target: r.Target, TargetName: a.ConnName(r.Target), Rule: fmt.Sprintf("%s: %s", kindTitle(r.Kind), raw), Note: strings.Join(notes, "; ")}
@@ -215,9 +218,9 @@ func (a *App) CheckRoute(host, process string) RouteCheck {
 		}
 	}
 	if cfg.Settings.AllowLAN && ip != nil && (ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLoopback()) {
-		return RouteCheck{Target: config.TargetDirect, TargetName: a.ConnName(config.TargetDirect), Rule: "локальная сеть"}
+		return RouteCheck{Target: config.TargetDirect, TargetName: a.ConnName(config.TargetDirect), Rule: i18n.T("app.localNetwork")}
 	}
-	return RouteCheck{Target: cfg.Settings.FinalTarget, TargetName: a.ConnName(cfg.Settings.FinalTarget), Rule: "правило по умолчанию", Note: strings.Join(notes, "; ")}
+	return RouteCheck{Target: cfg.Settings.FinalTarget, TargetName: a.ConnName(cfg.Settings.FinalTarget), Rule: i18n.T("app.defaultRule"), Note: strings.Join(notes, "; ")}
 }
 
 func globMatch(pattern, s string) bool {
@@ -229,27 +232,27 @@ func globMatch(pattern, s string) bool {
 func kindTitle(k string) string {
 	switch k {
 	case config.RuleProcess:
-		return "программа"
+		return i18n.T("app.program")
 	case config.RuleProcessPath:
-		return "путь программы"
+		return i18n.T("app.programPath")
 	case config.RuleDomain:
-		return "домен"
+		return i18n.T("app.domain")
 	case config.RuleDomainSuffix:
-		return "домен с поддоменами"
+		return i18n.T("app.domainWithSubdomains")
 	case config.RuleDomainKeyword:
-		return "домен содержит"
+		return i18n.T("app.domainContains")
 	case config.RuleDomainRegex:
-		return "домен (regex)"
+		return i18n.T("app.domainRegex")
 	case config.RuleIPCIDR:
-		return "IP/подсеть"
+		return i18n.T("app.ipSubnet")
 	case config.RuleGeoSite:
-		return "категория сайтов"
+		return i18n.T("app.siteCategory")
 	case config.RuleGeoIP:
-		return "страна IP"
+		return i18n.T("app.ipCountry")
 	case config.RuleDstPort:
-		return "порт"
+		return i18n.T("app.port")
 	case config.RuleNetwork:
-		return "протокол"
+		return i18n.T("app.protocol")
 	}
 	return k
 }

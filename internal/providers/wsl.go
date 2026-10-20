@@ -1,6 +1,8 @@
 package providers
 
 import (
+	"vpner/internal/i18n"
+
 	"bufio"
 	"errors"
 	"fmt"
@@ -25,7 +27,7 @@ func (openconnectProvider) Packages() []string {
 	return []string{"openconnect"}
 }
 func (openconnectProvider) Description() string {
-	return "Совместимые серверы: Cisco AnyConnect/Secure Client, Palo Alto GlobalProtect, Fortinet, Pulse/Ivanti, F5, Array. Запускается в изолированном контейнере WSL: трафик этого VPN физически не может уйти мимо туннеля. Если сервер требует проверку рабочего места (HostScan/posture), используйте оригинальный клиент в ВМ."
+	return i18n.T("providers.compatibleServersCiscoAnyconnectSecure")
 }
 
 var ocProtocols = []Option{
@@ -40,24 +42,24 @@ var ocProtocols = []Option{
 
 func (openconnectProvider) Fields() []Field {
 	return []Field{
-		{Key: "protocol", Label: "Тип сервера", Kind: "select", Default: "anyconnect", Options: ocProtocols},
-		{Key: "server", Label: "Сервер", Kind: "text", Required: true, Placeholder: "vpn.company.com или vpn.company.com/group"},
-		{Key: "username", Label: "Логин", Kind: "text"},
-		{Key: "password", Label: "Пароль", Kind: "text", Secret: true, Help: "Можно оставить пустым — программа спросит при подключении. Коды MFA/OTP тоже запрашиваются в окне."},
-		{Key: "mfaAnswer", Label: "Ответ на второй запрос (MFA)", Kind: "text", Placeholder: "push",
-			Help: "Если после пароля сервер спрашивает второй пароль или способ подтверждения (Duo: push / phone / sms) — программа ответит сама, останется только подтвердить вход. Если сервер просто ждёт подтверждения — оставьте пустым."},
-		{Key: "authgroup", Label: "Группа (authgroup)", Kind: "text", Advanced: true},
-		{Key: "sso", Label: "Вход через браузер (SAML/SSO)", Kind: "bool", Help: "Откроется страница входа вашей организации в браузере Windows."},
-		{Key: "servercert", Label: "Отпечаток сертификата сервера", Kind: "text", Advanced: true, Placeholder: "pin-sha256:...",
-			Help: "Для серверов с самоподписанным сертификатом. Отпечаток openconnect покажет при первом подключении."},
-		{Key: "certificate", Label: "Клиентский сертификат (PEM, вместе с ключом)", Kind: "textarea", Secret: true, Advanced: true},
+		{Key: "protocol", Label: i18n.T("providers.serverType"), Kind: "select", Default: "anyconnect", Options: ocProtocols},
+		{Key: "server", Label: i18n.T("providers.server"), Kind: "text", Required: true, Placeholder: i18n.T("providers.vpnCompanyComOrVpn")},
+		{Key: "username", Label: i18n.T("providers.login"), Kind: "text"},
+		{Key: "password", Label: i18n.T("providers.password"), Kind: "text", Secret: true, Help: i18n.T("providers.canStayEmptyProgramAsks")},
+		{Key: "mfaAnswer", Label: i18n.T("providers.answerToSecondPromptMfa"), Kind: "text", Placeholder: "push",
+			Help: i18n.T("providers.ifAfterPasswordServerAsks")},
+		{Key: "authgroup", Label: i18n.T("providers.groupAuthgroup"), Kind: "text", Advanced: true},
+		{Key: "sso", Label: i18n.T("providers.browserSignInSamlSso"), Kind: "bool", Help: i18n.T("providers.yourOrganizationsSignInPage")},
+		{Key: "servercert", Label: i18n.T("providers.serverCertificateFingerprint"), Kind: "text", Advanced: true, Placeholder: "pin-sha256:...",
+			Help: i18n.T("providers.forServersWithSelfSigned")},
+		{Key: "certificate", Label: i18n.T("providers.clientCertificatePemWithKey"), Kind: "textarea", Secret: true, Advanced: true},
 		{Key: "useragent", Label: "User-Agent", Kind: "text", Advanced: true, Placeholder: "AnyConnect Windows 5.1.2.42"},
 		fieldRouteAll(),
 		fieldFallbackDNS(),
 		fieldReconnect(),
-		{Key: "keepAlive", Label: "Не давать серверу отключать по простою", Kind: "bool", Default: "true", Advanced: true,
-			Help: "Раз в минуту через туннель уходит крошечный DNS-запрос, и сервер не завершает сессию из-за бездействия — не придётся заново подтверждать вход."},
-		{Key: "extraArgs", Label: "Дополнительные параметры openconnect", Kind: "text", Advanced: true, Placeholder: "--os=win --version-string=..."},
+		{Key: "keepAlive", Label: i18n.T("providers.keepServerFromEndingIdle"), Kind: "bool", Default: "true", Advanced: true,
+			Help: i18n.T("providers.onceMinuteTinyDnsQuery")},
+		{Key: "extraArgs", Label: i18n.T("providers.extraOpenconnectOptions"), Kind: "text", Advanced: true, Placeholder: "--os=win --version-string=..."},
 	}
 }
 
@@ -67,7 +69,7 @@ func extraArgs(s string) ([]string, error) {
 	var out []string
 	for _, a := range shellSplit(s) {
 		if unsafeArgRe.MatchString(a) {
-			return nil, fmt.Errorf("параметр %s управляется программой и не может быть переопределён", a)
+			return nil, fmt.Errorf(i18n.T("providers.optionIsManagedByProgram"), a)
 		}
 		out = append(out, a)
 	}
@@ -77,7 +79,7 @@ func extraArgs(s string) ([]string, error) {
 func (openconnectProvider) Spec(c *config.Connection) (*bridge.ProcSpec, error) {
 	server := c.P("server")
 	if server == "" {
-		return nil, errors.New("не указан сервер")
+		return nil, errors.New(i18n.T("providers.noServerGiven"))
 	}
 	proto := c.P("protocol")
 	if proto == "" {
@@ -169,21 +171,21 @@ func (openvpnProvider) Title() string      { return "OpenVPN" }
 func (openvpnProvider) Runtime() Runtime   { return RuntimeWSL }
 func (openvpnProvider) Packages() []string { return []string{"openvpn"} }
 func (openvpnProvider) Description() string {
-	return "Конфиг .ovpn (сертификаты встроены в файл). Запускается в изолированном контейнере WSL, работает и по UDP, и по TCP."
+	return i18n.T("providers.ovpnConfigWithCertificatesInside")
 }
 
 func (openvpnProvider) Fields() []Field {
 	return []Field{
-		{Key: "config", Label: "Конфиг .ovpn", Kind: "textarea", Secret: true, Required: true, Placeholder: "client\ndev tun\nproto udp\nremote vpn.example.com 1194\n<ca>\n...\n</ca>"},
-		{Key: "username", Label: "Логин (если нужен)", Kind: "text"},
-		{Key: "password", Label: "Пароль", Kind: "text", Secret: true},
-		{Key: "mfaAnswer", Label: "Ответ на запрос кода (MFA)", Kind: "text", Placeholder: "push",
-			Help: "Для серверов с запросом кода (static challenge): если вход подтверждается push-уведомлением, впишите сюда push — программа ответит сама."},
-		{Key: "keyPassword", Label: "Пароль закрытого ключа", Kind: "text", Secret: true, Advanced: true},
+		{Key: "config", Label: i18n.T("providers.ovpnConfig"), Kind: "textarea", Secret: true, Required: true, Placeholder: "client\ndev tun\nproto udp\nremote vpn.example.com 1194\n<ca>\n...\n</ca>"},
+		{Key: "username", Label: i18n.T("providers.loginIfNeeded"), Kind: "text"},
+		{Key: "password", Label: i18n.T("providers.password"), Kind: "text", Secret: true},
+		{Key: "mfaAnswer", Label: i18n.T("providers.answerToCodePromptMfa"), Kind: "text", Placeholder: "push",
+			Help: i18n.T("providers.forServersThatAskFor")},
+		{Key: "keyPassword", Label: i18n.T("providers.privateKeyPassword"), Kind: "text", Secret: true, Advanced: true},
 		fieldRouteAll(),
 		fieldFallbackDNS(),
 		fieldReconnect(),
-		{Key: "extraArgs", Label: "Дополнительные параметры openvpn", Kind: "text", Advanced: true},
+		{Key: "extraArgs", Label: i18n.T("providers.extraOpenvpnOptions"), Kind: "text", Advanced: true},
 	}
 }
 
@@ -223,7 +225,7 @@ func sanitizeOVPN(cfg string) (string, error) {
 			continue
 		}
 		if m := ovpnInlineFileRe.FindStringSubmatch(t); m != nil && m[2] != "[inline]" {
-			return "", fmt.Errorf("конфиг ссылается на внешний файл %q (%s) — вставьте его содержимое в блок <%s>...</%s> или импортируйте .ovpn файлом", m[2], m[1], m[1], m[1])
+			return "", fmt.Errorf(i18n.T("providers.configRefersToExternalFile"), m[2], m[1], m[1], m[1])
 		}
 		if strings.HasPrefix(strings.ToLower(t), "remote ") {
 			hasRemote = true
@@ -231,7 +233,7 @@ func sanitizeOVPN(cfg string) (string, error) {
 		out.WriteString(line + "\n")
 	}
 	if !hasRemote {
-		return "", errors.New("в конфиге нет строки remote")
+		return "", errors.New(i18n.T("providers.configHasNoRemoteLine"))
 	}
 	return out.String(), nil
 }

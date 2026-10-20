@@ -5,6 +5,8 @@
 package winutil
 
 import (
+	"vpner/internal/i18n"
+
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -135,7 +137,7 @@ func OpenAppWindow(url, profileDir string) error {
 func StartAppWindow(url, profileDir string, width, height int) (*exec.Cmd, error) {
 	edge := edgePath()
 	if edge == "" {
-		return nil, errors.New("не найден Microsoft Edge")
+		return nil, errors.New(i18n.T("winutil.microsoftEdgeNotFound"))
 	}
 	appProfilePrefs(profileDir)
 	cmd := exec.Command(edge, "--app="+url, "--user-data-dir="+profileDir, fmt.Sprintf("--window-size=%d,%d", width, height),

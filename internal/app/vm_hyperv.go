@@ -1,6 +1,8 @@
 package app
 
 import (
+	"vpner/internal/i18n"
+
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -37,7 +39,7 @@ func (a *App) ensureVMIdentity(id string) (*config.Connection, error) {
 	cfg := a.Config()
 	c := cfg.Conn(id)
 	if c == nil {
-		return nil, fmt.Errorf("подключение %s не найдено", id)
+		return nil, fmt.Errorf(i18n.T("app.connectionNotFound"), id)
 	}
 	if c.P("lanIp") != "" && c.P("wanMac") != "" && c.S("gwPass") != "" {
 		return c, nil
@@ -66,7 +68,7 @@ func (a *App) ensureVMIdentity(id string) (*config.Connection, error) {
 			}
 		}
 		if nc.Params["lanIp"] == "" {
-			return nil, errors.New("закончились адреса для виртуалок")
+			return nil, errors.New(i18n.T("app.noAddressesLeftForVirtual"))
 		}
 	}
 	if nc.Params["wanMac"] == "" {
@@ -88,7 +90,7 @@ func (a *App) ensureVMIdentity(id string) (*config.Connection, error) {
 func (a *App) vmConnect(id string, p VMRuntime) error {
 	a.setConn(id, func(rt *connRuntime) {
 		rt.Want = true
-		rt.State, rt.Detail, rt.Prompt = "starting", "подготовка виртуальной машины", nil
+		rt.State, rt.Detail, rt.Prompt = "starting", i18n.T("app.preparingVirtualMachine"), nil
 		rt.Since = time.Now().Unix()
 	})
 	fail := func(err error) error {
@@ -108,7 +110,7 @@ func (a *App) vmConnect(id string, p VMRuntime) error {
 	if err != nil {
 		return fail(err)
 	}
-	a.progress("Настройка сети Hyper-V", 0, -1)
+	a.progress(i18n.T("app.settingUpHyperVNetwork"), 0, -1)
 	if err := hyperv.EnsureLAN(); err != nil {
 		return fail(err)
 	}
@@ -136,8 +138,8 @@ func (a *App) vmConnect(id string, p VMRuntime) error {
 		if err != nil {
 			return fail(err)
 		}
-		a.progress("Создание виртуальной машины «"+c.Name+"»", 0, -1)
-		a.Log.Infof(id, "создаю виртуальную машину %s (%d МБ, %d CPU, диск %d ГБ, внешняя сеть: %s)", spec.VMName, spec.MemoryMB, spec.CPUs, spec.DiskGB, wan)
+		a.progress(fmt.Sprintf(i18n.T("app.creatingVirtualMachine"), c.Name), 0, -1)
+		a.Log.Infof(id, i18n.T("app.creatingVirtualMachineMbCpu"), spec.VMName, spec.MemoryMB, spec.CPUs, spec.DiskGB, wan)
 		err = hyperv.Create(base, hyperv.VMConfig{Name: spec.VMName, Dir: dir, MemoryMB: spec.MemoryMB, CPUs: spec.CPUs,
 			DiskGB: spec.DiskGB, WAN: wan, WANMac: c.P("wanMac"), LANMac: c.P("lanMac"), SeedDir: seed})
 		os.RemoveAll(seed)
@@ -148,7 +150,7 @@ func (a *App) vmConnect(id string, p VMRuntime) error {
 	a.clearProgress()
 	if st, _ := hyperv.State(spec.VMName); st != "Running" {
 		if err := hyperv.Start(spec.VMName); err != nil {
-			return fail(fmt.Errorf("запуск ВМ: %w", err))
+			return fail(fmt.Errorf(i18n.T("app.startingVm"), err))
 		}
 	}
 	rt := &vmRuntime{name: spec.VMName, ip: c.P("lanIp"), user: "vpner", pass: c.S("gwPass"), stop: make(chan struct{})}
@@ -159,10 +161,8 @@ func (a *App) vmConnect(id string, p VMRuntime) error {
 	a.vms[id] = rt
 	a.vmEndpoints[id] = engine.LocalEndpoint{Server: rt.ip, Port: 1080, User: rt.user, Pass: rt.pass, Iface: hyperv.LANAlias}
 	a.mu.Unlock()
-	a.setConn(id, func(r *connRuntime) {
-		r.State, r.Detail = "provisioning", "виртуальная машина запускается"
-	})
-	a.Log.Infof(id, "виртуальная машина %s запущена, адрес шлюза %s", spec.VMName, rt.ip)
+	a.setConn(id, func(r *connRuntime) { r.State, r.Detail = "provisioning", i18n.T("app.virtualMachineIsStarting") })
+	a.Log.Infof(id, i18n.T("app.virtualMachineIsRunningGateway"), spec.VMName, rt.ip)
 	go a.watchVM(id, rt)
 	return a.applyEngine()
 }
@@ -207,19 +207,19 @@ func (a *App) watchVM(id string, rt *vmRuntime) {
 		switch {
 		case err != nil:
 			state = "provisioning"
-			detail = "виртуальная машина загружается"
+			detail = i18n.T("app.virtualMachineIsBooting")
 			if time.Since(started) > 90*time.Second {
-				detail = "первая настройка ВМ (при первом запуске до 10–15 минут). Ход можно смотреть в окне ВМ"
+				detail = i18n.T("app.firstVmSetupUpTo")
 			}
 		case len(st.Tunnels) == 0:
 			state = "novpn"
-			detail = "откройте окно ВМ и подключите в ней VPN-программу"
+			detail = i18n.T("app.openVmWindowAndConnect")
 			if st.Provision == "running" {
-				detail = "ВМ ещё настраивается (устанавливается рабочий стол); потом подключите в ней VPN"
+				detail = i18n.T("app.vmIsStillBeingSet")
 			}
 		default:
 			state = "up"
-			detail = "туннель " + st.Tunnels[0].Name
+			detail = fmt.Sprintf(i18n.T("app.tunnel"), st.Tunnels[0].Name)
 			if len(st.Tunnels[0].Addrs) > 0 {
 				ip = strings.Split(st.Tunnels[0].Addrs[0], "/")[0]
 			}
@@ -255,7 +255,7 @@ func (a *App) vmStop(id string) {
 	close(rt.stop)
 	// Save rather than shut down: the VPN app session survives and resumes fast.
 	if err := hyperv.Save(rt.name); err != nil {
-		a.Log.Warnf(id, "приостановка ВМ: %v", err)
+		a.Log.Warnf(id, i18n.T("app.pausingVm"), err)
 	}
 }
 
@@ -283,10 +283,10 @@ func (a *App) vmName(id string) (string, bool) {
 func (a *App) OpenConsole(id string) error {
 	name, ok := a.vmName(id)
 	if !ok {
-		return errors.New("это подключение не виртуальная машина")
+		return errors.New(i18n.T("app.thisConnectionIsNotVirtual"))
 	}
 	if !hyperv.Exists(name) {
-		return errors.New("виртуальная машина ещё не создана — нажмите «Подключить»")
+		return errors.New(i18n.T("app.virtualMachineIsNotCreated"))
 	}
 	return hyperv.OpenConsole(name)
 }
@@ -298,9 +298,9 @@ func (a *App) removeVM(id string) {
 		return
 	}
 	if err := hyperv.Remove(name, a.vmDir(id)); err != nil {
-		a.Log.Warnf(id, "удаление ВМ: %v", err)
+		a.Log.Warnf(id, i18n.T("app.deletingVm"), err)
 	} else {
-		a.Log.Infof(id, "виртуальная машина %s удалена", name)
+		a.Log.Infof(id, i18n.T("app.virtualMachineDeleted"), name)
 	}
 }
 
@@ -310,20 +310,20 @@ func (a *App) VMUpload(id, name string, body io.Reader) error {
 	rt := a.vms[id]
 	a.mu.Unlock()
 	if rt == nil {
-		return errors.New("сначала подключите виртуальную машину")
+		return errors.New(i18n.T("app.connectVirtualMachineFirst"))
 	}
 	req, _ := http.NewRequest(http.MethodPost, "http://"+rt.ip+":1081/upload?name="+url.QueryEscape(filepath.Base(name)), body)
 	req.SetBasicAuth(rt.user, rt.pass)
 	resp, err := (&http.Client{Timeout: 30 * time.Minute, Transport: &http.Transport{Proxy: nil}}).Do(req)
 	if err != nil {
-		return fmt.Errorf("шлюз ВМ недоступен: %w", err)
+		return fmt.Errorf(i18n.T("app.vmGatewayIsUnreachable"), err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
 		b, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("ВМ отклонила файл: %s", strings.TrimSpace(string(b)))
+		return fmt.Errorf(i18n.T("app.vmRejectedFile"), strings.TrimSpace(string(b)))
 	}
-	a.Log.Infof(id, "файл %s передан в ВМ (папка «Файлы из VPNer»)", filepath.Base(name))
+	a.Log.Infof(id, i18n.T("app.fileSentToVmFiles"), filepath.Base(name))
 	return nil
 }
 

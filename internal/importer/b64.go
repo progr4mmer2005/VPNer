@@ -1,6 +1,8 @@
 package importer
 
 import (
+	"vpner/internal/i18n"
+
 	"encoding/base64"
 	"errors"
 	"strings"
@@ -13,5 +15,5 @@ func b64(s string) ([]byte, error) {
 			return b, nil
 		}
 	}
-	return nil, errors.New("не base64")
+	return nil, errors.New(i18n.T("importer.notBase64"))
 }

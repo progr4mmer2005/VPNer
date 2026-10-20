@@ -3,6 +3,8 @@
 package wslhost
 
 import (
+	"vpner/internal/i18n"
+
 	"bufio"
 	"bytes"
 	"context"
@@ -39,7 +41,7 @@ func Command(args ...string) *exec.Cmd {
 func Available() error {
 	out, err := Command("--status").CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("WSL недоступен: %v: %s", err, strings.TrimSpace(string(out)))
+		return fmt.Errorf(i18n.T("wslhost.wslIsUnavailable"), err, strings.TrimSpace(string(out)))
 	}
 	return nil
 }
@@ -151,7 +153,7 @@ func (s *Session) Start() error {
 		d := &net.Dialer{Timeout: 20 * time.Second}
 		s.Dial = d.Dial
 	}
-	cmd := Command("-d", s.Distro, "-u", "root", "--exec", AgentPath, "serve")
+	cmd := Command("-d", s.Distro, "-u", "root", "--exec", "/usr/bin/env", "VPNER_LANG="+i18n.Lang(), AgentPath, "serve")
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return err
@@ -200,13 +202,13 @@ func (s *Session) Start() error {
 		select {
 		case <-ctx.Done():
 			s.Close()
-			return fmt.Errorf("агент не отвечает: %v", err)
+			return fmt.Errorf(i18n.T("wslhost.agentDoesNotAnswer"), err)
 		case <-s.done:
-			return fmt.Errorf("агент завершился: %v", s.err)
+			return fmt.Errorf(i18n.T("wslhost.agentExited"), s.err)
 		case <-time.After(300 * time.Millisecond):
 		}
 	}
-	s.logf("агент WSL на связи: %v", pong)
+	s.logf(i18n.T("wslhost.wslAgentConnected"), pong)
 	go s.eventLoop()
 	return nil
 }
@@ -229,7 +231,7 @@ func (s *Session) Close() {
 
 func (s *Session) Call(method string, params, result any) error {
 	if s.sess == nil {
-		return errors.New("агент не запущен")
+		return errors.New(i18n.T("wslhost.agentIsNotRunning"))
 	}
 	return bridge.Call(s.sess, method, params, result)
 }
@@ -388,7 +390,7 @@ type ConnBackend struct {
 
 func (b *ConnBackend) DialTCP(addr string) (net.Conn, error) {
 	if b.S.sess == nil {
-		return nil, errors.New("агент не запущен")
+		return nil, errors.New(i18n.T("wslhost.agentIsNotRunning"))
 	}
 	c, _, err := bridge.Open(b.S.sess, bridge.Header{Op: bridge.OpDial, Conn: b.Conn, Addr: addr})
 	if err != nil {
@@ -399,7 +401,7 @@ func (b *ConnBackend) DialTCP(addr string) (net.Conn, error) {
 
 func (b *ConnBackend) OpenUDP() (socks5.UDPSession, error) {
 	if b.S.sess == nil {
-		return nil, errors.New("агент не запущен")
+		return nil, errors.New(i18n.T("wslhost.agentIsNotRunning"))
 	}
 	c, _, err := bridge.Open(b.S.sess, bridge.Header{Op: bridge.OpUDP, Conn: b.Conn})
 	if err != nil {

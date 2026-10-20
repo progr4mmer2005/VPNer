@@ -3,6 +3,8 @@
 package agent
 
 import (
+	"vpner/internal/i18n"
+
 	"bufio"
 	"encoding/base64"
 	"fmt"
@@ -45,7 +47,7 @@ func (c *conn) runOpenVPNMgmt(cmd *exec.Cmd) {
 		time.Sleep(100 * time.Millisecond)
 	}
 	if conn == nil {
-		c.log("management: не удалось подключиться к OpenVPN")
+		c.log(i18n.T("agent.managementCouldNotConnectTo"))
 		return
 	}
 	defer conn.Close()
@@ -81,7 +83,7 @@ func (c *conn) runOpenVPNMgmt(cmd *exec.Cmd) {
 			next(user)
 			return
 		}
-		c.askUser("Логин OpenVPN:", false, func(u string) {
+		c.askUser(i18n.T("agent.openvpnLogin"), false, func(u string) {
 			user = strings.TrimSpace(u)
 			next(user)
 		})
@@ -91,7 +93,7 @@ func (c *conn) runOpenVPNMgmt(cmd *exec.Cmd) {
 			next(pass)
 			return
 		}
-		c.askUser("Пароль OpenVPN:", true, func(p string) {
+		c.askUser(i18n.T("agent.openvpnPassword"), true, func(p string) {
 			pass, passRejected = p, false
 			next(pass)
 		})
@@ -119,11 +121,11 @@ func (c *conn) runOpenVPNMgmt(cmd *exec.Cmd) {
 		case failRe.MatchString(line):
 			if crvState == "" && c.retryAfterSlowFailure(authSentAt) {
 				// the server waited for a confirmation that did not come
-				c.log("вход не был подтверждён — повторяю с сохранённым паролем")
+				c.log(i18n.T("agent.loginWasNotConfirmedRetrying"))
 				authSentAt = time.Time{}
 				break
 			}
-			c.log("OpenVPN: сервер отклонил логин/пароль или код")
+			c.log(i18n.T("agent.openvpnServerRejectedLoginPassword"))
 			passRejected = true
 			c.mu.Lock()
 			c.answered = map[int]bool{}
@@ -136,13 +138,13 @@ func (c *conn) runOpenVPNMgmt(cmd *exec.Cmd) {
 				if keyPass != "" && !passRejected {
 					send("password " + mgmtQuote(typ) + " " + mgmtQuote(keyPass))
 				} else {
-					c.askUser("Пароль закрытого ключа:", true, func(p string) {
+					c.askUser(i18n.T("agent.privateKeyPassword"), true, func(p string) {
 						keyPass = p
 						send("password " + mgmtQuote(typ) + " " + mgmtQuote(p))
 					})
 				}
 			case kind == "password":
-				c.askUser(fmt.Sprintf("OpenVPN запрашивает «%s»:", typ), true, func(p string) {
+				c.askUser(fmt.Sprintf(i18n.T("agent.openvpnAsksFor"), typ), true, func(p string) {
 					send("password " + mgmtQuote(typ) + " " + mgmtQuote(p))
 				})
 			case crvState != "":
@@ -150,7 +152,7 @@ func (c *conn) runOpenVPNMgmt(cmd *exec.Cmd) {
 				st, u, r := crvState, crvUser, crvResponse
 				crvState, crvResponse = "", ""
 				if r == "" {
-					c.askUser("Код подтверждения:", true, func(r string) {
+					c.askUser(i18n.T("agent.confirmationCode"), true, func(r string) {
 						sendAuth(typ, u, "CRV1::"+st+"::"+strings.TrimSpace(r))
 					})
 				} else {

@@ -1,6 +1,9 @@
 package config
 
 import (
+	"errors"
+	"vpner/internal/i18n"
+
 	"fmt"
 	"net"
 	"net/url"
@@ -46,7 +49,7 @@ const (
 // DefaultDNS returns the initial resolver setup: the system resolver.
 func DefaultDNS() DNS {
 	return DNS{
-		Servers: []DNSServer{{ID: DNSSystemID, Name: "Системный (DNS вашей сети)", Address: "system"}},
+		Servers: []DNSServer{{ID: DNSSystemID, Name: i18n.T("config.systemYourNetworksDns"), Address: "system"}},
 		Rules:   []DNSRule{},
 		Default: []string{DNSSystemID},
 		Mode:    DNSModeFakeIP,
@@ -57,10 +60,10 @@ func DefaultDNS() DNS {
 func DNSProtocol(addr string, h3 bool) (string, error) {
 	a := strings.TrimSpace(addr)
 	if a == "" {
-		return "", fmt.Errorf("пустой адрес DNS")
+		return "", errors.New(i18n.T("config.emptyDnsAddress"))
 	}
 	if a == "system" {
-		return "Системный", nil
+		return i18n.T("config.system"), nil
 	}
 	if !strings.Contains(a, "://") {
 		host := a
@@ -68,13 +71,13 @@ func DNSProtocol(addr string, h3 bool) (string, error) {
 			host = h
 		}
 		if net.ParseIP(host) == nil {
-			return "", fmt.Errorf("DNS %q: для обычного DNS нужен IP-адрес (имя можно указывать только для DoH/DoT/DoQ)", a)
+			return "", fmt.Errorf(i18n.T("config.dnsPlainDnsServerNeeds"), a)
 		}
 		return "UDP", nil
 	}
 	u, err := url.Parse(a)
 	if err != nil || u.Host == "" {
-		return "", fmt.Errorf("DNS %q: неверный адрес", a)
+		return "", fmt.Errorf(i18n.T("config.dnsInvalidAddress"), a)
 	}
 	switch u.Scheme {
 	case "udp":
@@ -93,7 +96,7 @@ func DNSProtocol(addr string, h3 bool) (string, error) {
 	case "dhcp":
 		return "DHCP", nil
 	}
-	return "", fmt.Errorf("DNS %q: протокол %s не поддерживается (udp, tcp, tls, https, quic)", a, u.Scheme)
+	return "", fmt.Errorf(i18n.T("config.dnsProtocolIsNotSupported"), a, u.Scheme)
 }
 
 func (d *DNS) Server(id string) *DNSServer {
@@ -109,42 +112,42 @@ func (d *DNS) validate(conns map[string]bool) error {
 	ids := map[string]bool{}
 	for _, s := range d.Servers {
 		if s.ID == "" || ids[s.ID] {
-			return fmt.Errorf("DNS-сервер «%s»: неверный или повторяющийся id", s.Name)
+			return fmt.Errorf(i18n.T("config.dnsServerInvalidOrDuplicate"), s.Name)
 		}
 		ids[s.ID] = true
 		if strings.TrimSpace(s.Name) == "" {
-			return fmt.Errorf("у DNS-сервера %s нет названия", s.Address)
+			return fmt.Errorf(i18n.T("config.dnsServerHasNoName"), s.Address)
 		}
 		if _, err := DNSProtocol(s.Address, s.HTTP3); err != nil {
 			return err
 		}
 		if s.Via != "" && !conns[s.Via] {
-			return fmt.Errorf("DNS-сервер «%s»: подключение для маршрута не найдено", s.Name)
+			return fmt.Errorf(i18n.T("config.dnsServerRoutesConnectionWas"), s.Name)
 		}
 		if s.Via != "" && s.Address == "system" {
-			return fmt.Errorf("DNS-сервер «%s»: системный DNS нельзя отправить через VPN — укажите конкретный адрес", s.Name)
+			return fmt.Errorf(i18n.T("config.dnsServerSystemDnsCannot"), s.Name)
 		}
 	}
 	if len(d.Default) == 0 {
-		return fmt.Errorf("не выбран DNS по умолчанию")
+		return errors.New(i18n.T("config.noDefaultDnsChosen"))
 	}
 	for _, id := range d.Default {
 		if !ids[id] {
-			return fmt.Errorf("DNS по умолчанию ссылается на удалённый сервер")
+			return errors.New(i18n.T("config.defaultDnsRefersToDeleted"))
 		}
 	}
 	for _, r := range d.Rules {
 		if !ids[r.Server] {
-			return fmt.Errorf("правило DNS %v ссылается на неизвестный сервер", r.Values)
+			return fmt.Errorf(i18n.T("config.dnsRuleRefersToUnknown"), r.Values)
 		}
 		switch r.Kind {
 		case "domain-suffix", "domain", "geosite":
 		default:
-			return fmt.Errorf("неизвестный тип правила DNS %q", r.Kind)
+			return fmt.Errorf(i18n.T("config.unknownDnsRuleType"), r.Kind)
 		}
 	}
 	if d.Mode != DNSModeFakeIP && d.Mode != DNSModeRealIP {
-		return fmt.Errorf("неизвестный режим DNS %q", d.Mode)
+		return fmt.Errorf(i18n.T("config.unknownDnsMode"), d.Mode)
 	}
 	return nil
 }

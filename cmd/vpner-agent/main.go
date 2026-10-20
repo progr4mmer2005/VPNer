@@ -9,6 +9,7 @@ import (
 	"os"
 
 	"vpner/internal/agent"
+	"vpner/internal/i18n"
 )
 
 func main() {
@@ -16,6 +17,8 @@ func main() {
 		fmt.Fprintln(os.Stderr, "usage: vpner-agent serve | gateway <config.json> | hook <kind> <id> [args] | version")
 		os.Exit(2)
 	}
+	// set by the host (wslhost) and inherited by hooks
+	i18n.SetLang(i18n.Resolve(os.Getenv("VPNER_LANG")))
 	var err error
 	switch os.Args[1] {
 	case "serve":

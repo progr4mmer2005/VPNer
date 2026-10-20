@@ -10,6 +10,8 @@
 package providers
 
 import (
+	"vpner/internal/i18n"
+
 	"errors"
 	"fmt"
 	"sort"
@@ -86,7 +88,7 @@ func Register(p Provider) {
 func Get(t string) (Provider, error) {
 	p, ok := registry[t]
 	if !ok {
-		return nil, fmt.Errorf("неизвестный тип подключения %q", t)
+		return nil, fmt.Errorf(i18n.T("providers.unknownConnectionType"), t)
 	}
 	return p, nil
 }
@@ -144,7 +146,7 @@ func Validate(c *config.Connection) error {
 			v = c.S(f.Key)
 		}
 		if strings.TrimSpace(v) == "" {
-			return fmt.Errorf("%s: поле «%s» обязательно", c.Name, f.Label)
+			return fmt.Errorf(i18n.T("providers.fieldIsRequired"), c.Name, f.Label)
 		}
 	}
 	switch pp := p.(type) {
@@ -165,7 +167,7 @@ func Validate(c *config.Connection) error {
 func Import(filename, data string) (*config.Connection, error) {
 	data = strings.TrimSpace(strings.TrimPrefix(data, "\uFEFF"))
 	if data == "" {
-		return nil, errors.New("пусто")
+		return nil, errors.New(i18n.T("providers.empty"))
 	}
 	for _, t := range order {
 		if im, ok := registry[t].(Importer); ok && im.Detect(filename, data) {
@@ -184,7 +186,7 @@ func Import(filename, data string) (*config.Connection, error) {
 			return c, nil
 		}
 	}
-	return nil, errors.New("не удалось распознать формат: поддерживаются .conf WireGuard/AmneziaWG, vpn:// (Amnezia), .ovpn, ссылки vless/vmess/trojan/ss/hysteria2/tuic/socks/http")
+	return nil, errors.New(i18n.T("providers.unrecognizedFormatSupportedAreWireguard"))
 }
 
 // ServerHosts returns hostnames/IPs of VPN servers a connection talks to, so
@@ -200,17 +202,17 @@ func ServerHosts(c *config.Connection) []string {
 
 // common fields
 func fieldRouteAll() Field {
-	return Field{Key: "routeAll", Label: "Весь трафик в туннель", Kind: "bool", Default: "true",
-		Help: "Если сервер даёт только корпоративные подсети (split-tunnel), всё равно направлять туда весь трафик этого подключения. Выключите для корпоративных VPN, которые не выпускают в интернет."}
+	return Field{Key: "routeAll", Label: i18n.T("providers.allTrafficIntoTunnel"), Kind: "bool", Default: "true",
+		Help: i18n.T("providers.ifServerGivesOnlyCorporate")}
 }
 
 func fieldFallbackDNS() Field {
-	return Field{Key: "fallbackDns", Label: "DNS, если VPN не выдал свой", Kind: "text", Default: "1.1.1.1 8.8.8.8",
-		Help: "Запросы к этим серверам идут только внутри туннеля.", Advanced: true}
+	return Field{Key: "fallbackDns", Label: i18n.T("providers.dnsIfVpnGivesNone"), Kind: "text", Default: "1.1.1.1 8.8.8.8",
+		Help: i18n.T("providers.queriesToTheseServersGo"), Advanced: true}
 }
 
 func fieldReconnect() Field {
-	return Field{Key: "reconnect", Label: "Переподключаться автоматически", Kind: "bool", Default: "true", Advanced: true}
+	return Field{Key: "reconnect", Label: i18n.T("providers.reconnectAutomatically"), Kind: "bool", Default: "true", Advanced: true}
 }
 
 func splitList(s string) []string {

@@ -3,6 +3,8 @@
 package config
 
 import (
+	"vpner/internal/i18n"
+
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -155,13 +157,13 @@ func (c *Config) Validate() error {
 	ids := map[string]bool{}
 	for _, cn := range c.Connections {
 		if !idRe.MatchString(cn.ID) {
-			return fmt.Errorf("некорректный id подключения %q", cn.ID)
+			return fmt.Errorf(i18n.T("config.invalidConnectionId"), cn.ID)
 		}
 		if ids[cn.ID] {
-			return fmt.Errorf("повторяющийся id подключения %q", cn.ID)
+			return fmt.Errorf(i18n.T("config.duplicateConnectionId"), cn.ID)
 		}
 		if strings.TrimSpace(cn.Name) == "" {
-			return fmt.Errorf("у подключения %s нет имени", cn.ID)
+			return fmt.Errorf(i18n.T("config.connectionHasNoName"), cn.ID)
 		}
 		ids[cn.ID] = true
 	}
@@ -169,14 +171,14 @@ func (c *Config) Validate() error {
 		if t == TargetDirect || t == TargetBlock || ids[t] {
 			return nil
 		}
-		return fmt.Errorf("%s: неизвестная цель %q", where, t)
+		return fmt.Errorf(i18n.T("config.unknownTarget"), where, t)
 	}
 	for _, r := range c.Rules {
-		if err := check(r.Target, "правило "+ruleTitle(r)); err != nil {
+		if err := check(r.Target, fmt.Sprintf(i18n.T("config.rule"), ruleTitle(r))); err != nil {
 			return err
 		}
 	}
-	if err := check(c.Settings.FinalTarget, "правило по умолчанию"); err != nil {
+	if err := check(c.Settings.FinalTarget, i18n.T("config.defaultRule")); err != nil {
 		return err
 	}
 	return c.DNS.validate(ids)
@@ -231,7 +233,7 @@ func (s *Store) Load() (*Config, error) {
 		for k, v := range cfg.Connections[i].Secrets {
 			dec, err := unprotect(v)
 			if err != nil {
-				return nil, fmt.Errorf("не удалось расшифровать секрет %s/%s: %w", cfg.Connections[i].Name, k, err)
+				return nil, fmt.Errorf(i18n.T("config.couldNotDecryptSecret"), cfg.Connections[i].Name, k, err)
 			}
 			cfg.Connections[i].Secrets[k] = dec
 		}

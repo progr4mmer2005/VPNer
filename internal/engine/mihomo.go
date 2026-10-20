@@ -1,6 +1,8 @@
 package engine
 
 import (
+	"vpner/internal/i18n"
+
 	"bufio"
 	"bytes"
 	"context"
@@ -89,7 +91,7 @@ func (m *Mihomo) Test(conf map[string]any) error {
 	hideWindow(cmd)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("конфигурация движка отклонена: %s", lastLines(string(out), 6))
+		return fmt.Errorf(i18n.T("engine.engineRejectedConfiguration"), lastLines(string(out), 6))
 	}
 	return nil
 }
@@ -183,7 +185,7 @@ func (m *Mihomo) startLocked(conf map[string]any) error {
 			m.mu.Lock()
 			e := m.lastErr
 			m.mu.Unlock()
-			return fmt.Errorf("движок завершился при запуске: %s", e)
+			return fmt.Errorf(i18n.T("engine.engineExitedWhileStarting"), e)
 		default:
 		}
 		if _, err := m.Version(); err == nil {
@@ -192,7 +194,7 @@ func (m *Mihomo) startLocked(conf map[string]any) error {
 		time.Sleep(200 * time.Millisecond)
 	}
 	m.Stop()
-	return errors.New("движок не ответил за 30 секунд")
+	return errors.New(i18n.T("engine.engineDidNotAnswerWithin"))
 }
 
 // Exited is closed when the current process exits.

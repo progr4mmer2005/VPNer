@@ -4,6 +4,8 @@
 package deps
 
 import (
+	"vpner/internal/i18n"
+
 	"archive/zip"
 	"crypto/sha256"
 	"crypto/sha512"
@@ -45,7 +47,7 @@ func DebianCloud() (Artifact, error) {
 	case "arm64":
 		arch, sum = "arm64", "cb80554bf05aa9eb42d0b99a9a395fefad04edc8435514c5387e32f4da83b7827c34809f6249b365dedacd3f0688580f2957fd13b388639c987058bbe127fa8d"
 	default:
-		return Artifact{}, fmt.Errorf("архитектура %s не поддерживается", runtime.GOARCH)
+		return Artifact{}, fmt.Errorf(i18n.T("deps.architectureIsNotSupported"), runtime.GOARCH)
 	}
 	f := "debian-13-generic-" + arch + "-" + DebianRelease + ".tar.xz"
 	return Artifact{Name: "Debian 13", File: f, SHA512: sum,
@@ -69,7 +71,7 @@ func Mihomo() (Artifact, error) {
 			URL:    "https://github.com/MetaCubeX/mihomo/releases/download/" + MihomoVersion + "/" + f,
 			SHA256: "7a4f6e58af9a120920935f2150cf642d945085fdb3e753314505b334234e1d1e"}, nil
 	}
-	return Artifact{}, fmt.Errorf("архитектура %s не поддерживается", runtime.GOARCH)
+	return Artifact{}, fmt.Errorf(i18n.T("deps.architectureIsNotSupported"), runtime.GOARCH)
 }
 
 func Alpine() (Artifact, error) {
@@ -80,7 +82,7 @@ func Alpine() (Artifact, error) {
 	case "arm64":
 		arch, sum = "aarch64", "9bf70a7f18ea44094cbb5f70c58f9af129c8214745743db0e68e5502cc2ce773"
 	default:
-		return Artifact{}, fmt.Errorf("архитектура %s не поддерживается", runtime.GOARCH)
+		return Artifact{}, fmt.Errorf(i18n.T("deps.architectureIsNotSupported"), runtime.GOARCH)
 	}
 	f := "alpine-minirootfs-" + AlpineVersion + "-" + arch + ".tar.gz"
 	minor := AlpineVersion[:strings.LastIndex(AlpineVersion, ".")]
@@ -114,12 +116,12 @@ func Fetch(a Artifact, cacheDir string, progress Progress) (string, error) {
 	}
 	if lastErr != nil {
 		os.Remove(tmp)
-		return "", fmt.Errorf("не удалось скачать %s: %v\nМожно скачать вручную: %s и положить в %s", a.Name, lastErr, a.URL, cacheDir)
+		return "", fmt.Errorf(i18n.T("deps.couldNotDownloadYouCan"), a.Name, lastErr, a.URL, cacheDir)
 	}
 	ok, sum := verify(tmp, want, big)
 	if !ok {
 		os.Remove(tmp)
-		return "", fmt.Errorf("%s: контрольная сумма не совпала (получено %s, ожидалось %s) — файл повреждён или подменён", a.Name, sum, want)
+		return "", fmt.Errorf(i18n.T("deps.checksumMismatchGotExpectedFile"), a.Name, sum, want)
 	}
 	if err := os.Rename(tmp, dst); err != nil {
 		return "", err
@@ -160,7 +162,7 @@ func download(a Artifact, dst string, progress Progress) error {
 			}
 			done += int64(n)
 			if progress != nil && time.Since(last) > 200*time.Millisecond {
-				progress("Скачивание "+a.Name, done, total)
+				progress(fmt.Sprintf(i18n.T("deps.downloading"), a.Name), done, total)
 				last = time.Now()
 			}
 		}
@@ -172,7 +174,7 @@ func download(a Artifact, dst string, progress Progress) error {
 		}
 	}
 	if progress != nil {
-		progress("Скачивание "+a.Name, done, total)
+		progress(fmt.Sprintf(i18n.T("deps.downloading"), a.Name), done, total)
 	}
 	return f.Sync()
 }
@@ -212,7 +214,7 @@ func EnsureMihomo(binDir, cacheDir string, progress Progress) (string, error) {
 		return "", err
 	}
 	if progress != nil {
-		progress("Распаковка "+a.Name, 0, -1)
+		progress(fmt.Sprintf(i18n.T("deps.unpacking"), a.Name), 0, -1)
 	}
 	if err := os.MkdirAll(binDir, 0o755); err != nil {
 		return "", err
@@ -244,13 +246,13 @@ func EnsureMihomo(binDir, cacheDir string, progress Progress) (string, error) {
 			return "", err
 		}
 		if err := os.Rename(tmp, exe); err != nil {
-			return "", fmt.Errorf("не удалось заменить mihomo.exe (он запущен?): %w", err)
+			return "", fmt.Errorf(i18n.T("deps.couldNotReplaceMihomoExe"), err)
 		}
 		found = true
 		break
 	}
 	if !found {
-		return "", errors.New("в архиве mihomo нет .exe")
+		return "", errors.New(i18n.T("deps.mihomoArchiveHasNoExe"))
 	}
 	os.WriteFile(marker, []byte(a.SHA256), 0o644)
 	return exe, nil

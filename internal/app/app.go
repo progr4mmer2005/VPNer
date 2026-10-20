@@ -129,6 +129,7 @@ func New(dataDir string) (*App, error) {
 		return nil, err
 	}
 	a.cfg = cfg
+	i18n.SetLang(i18n.Resolve(cfg.Settings.Language))
 	return a, nil
 }
 
@@ -424,6 +425,7 @@ func (a *App) SaveSettings(s config.Settings) error {
 	if err := a.commit(cfg); err != nil {
 		return err
 	}
+	i18n.SetLang(i18n.Resolve(s.Language))
 	if prevAuto != s.Autostart {
 		if err := winutil.SetAutostart(s.Autostart); err != nil {
 			return err

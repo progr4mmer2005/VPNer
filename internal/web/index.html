@@ -1379,7 +1379,7 @@ function renderSetup() {
       <ul class="wiz-list"><li>${tr("ui.ciscoOpenvpnAmneziawgWireguardVless")}</li>
         <li>${tr("ui.rulesForProgramsSitesAnd")}</li><li>${tr("ui.killSwitchOnFailureTraffic")}</li></ul>
       ${SETUP.info.installed ? `<div class="banner info" style="margin:16px 0 0">${tr("ui.setup.update", esc(SETUP.info.installed))}</div>` : ""}`;
-    foot = `<span></span><button class="btn primary big" data-go="theme">${tr("ui.start")}</button>`;
+    foot = `<div class="seg" id="wz-lang">${I18N.langs.map(l => `<button data-lang="${l.id}" class="${l.id === I18N.lang ? "on" : ""}">${esc(l.name)}</button>`).join("")}</div><button class="btn primary big" data-go="theme">${tr("ui.start")}</button>`;
   } else if (st === "theme") {
     const prev = th => { const mode = th.modes.includes(eff) ? eff : th.modes[0];
       return `<div class="th-prev" data-theme="${th.id}" data-mode="${mode}" aria-hidden="true"><div class="p-nav"><i class="on"></i><i></i><i></i><i></i></div><div class="p-main"><div class="p-card"><b>${tr("ui.connections")}</b><div class="p-row"><span class="p-dot"></span><span>Cisco</span></div><span class="p-btn">${tr("ui.turnOn")}</span></div></div></div>`; };
@@ -1415,6 +1415,11 @@ function renderSetup() {
 function setupWire() {
   const v = $("#view"), o = SETUP.opts;
   v.querySelectorAll("[data-go]").forEach(b => b.onclick = () => setupGo(b.dataset.go));
+  v.querySelectorAll("[data-lang]").forEach(b => b.onclick = async () => {
+    if (b.dataset.lang === I18N.lang) return;
+    await api("POST", "/api/setup/lang", { lang: b.dataset.lang }).catch(() => {});
+    location.reload();
+  });
   v.querySelectorAll("[data-th]").forEach(b => b.onclick = () => { AP.theme = b.dataset.th; apSave(); typedTab = null; setupGo("theme"); });
   v.querySelectorAll("#ap-mode [data-m]").forEach(b => b.onclick = () => { AP.mode = b.dataset.m; apSave(); renderSetup(); });
   v.querySelectorAll("[data-accent]").forEach(b => b.onclick = () => {
@@ -2356,6 +2361,9 @@ async function renderSettings() {
   const s = S.cfg.settings;
   const chk = (k, title, help) => `<div class="field"><label class="check"><input type="checkbox" class="switch" data-s="${k}" ${s[k] ? "checked" : ""}><span><b style="font-size:13px">${title}</b><br><span style="color:var(--muted);font-size:12.5px">${help}</span></span></label></div>`;
   $("#view").innerHTML = `<h2>${tr("ui.settings")}</h2><p class="lead">${tr("ui.changesApplyAtOnceWithout")}</p>
+    <div class="panel"><h3>${tr("ui.settings.language")}</h3>
+      <div class="field" style="margin:0"><select id="s-lang" style="max-width:260px"><option value="">${tr("ui.settings.languageAuto")}</option>${I18N.langs.map(l => `<option value="${l.id}" ${l.id === (s.language || "") ? "selected" : ""}>${esc(l.name)}</option>`).join("")}</select>
+      <span class="help">${tr("ui.settings.languageHelp")}</span></div></div>
     <div class="panel"><h3>${tr("ui.security")}</h3>
       ${chk("killSwitch", tr("ui.systemKillSwitch"), tr("ui.whileVpnerIsOnWindows"))}
       ${chk("allowLan", tr("ui.localNetworkDirectly"), tr("ui.printersNasRouter100"))}
@@ -2383,10 +2391,12 @@ async function renderSettings() {
   const save = async () => {
     const ns = { ...S.cfg.settings };
     $$("[data-s]").forEach(el => ns[el.dataset.s] = el.checked);
-    ns.tunStack = $("#s-stack").value; ns.logLevel = $("#s-log").value;
+    ns.tunStack = $("#s-stack").value; ns.logLevel = $("#s-log").value; ns.language = $("#s-lang").value;
+    const relang = (ns.language || "") !== (S.cfg.settings.language || "");
     await act(() => api("PUT", "/api/settings", ns), tr("ui.saved")); await loadConfig();
+    if (relang) location.reload(); // the page comes with the texts of its language
   };
-  $$("[data-s], #s-stack, #s-log").forEach(el => el.onchange = save);
+  $$("[data-s], #s-stack, #s-log, #s-lang").forEach(el => el.onchange = save);
   try {
     const w = await api("GET", "/api/wsl");
     $("#wsl-st").innerHTML = !w.wslInstalled ? `${tr("ui.wslIsNotInstalledIt")} <button class="btn small" onclick="installWSL()">${tr("ui.installWsl")}</button><br>${esc(w.detail || "")}`

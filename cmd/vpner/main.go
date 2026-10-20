@@ -189,6 +189,11 @@ func main() {
 		systray.SetOnTapped(openUI)
 
 		update := func() {
+			// the language may have been changed in Settings
+			mOpen.SetTitle(i18n.T("main.openVpner"))
+			mRestore.SetTitle(i18n.T("main.restoreNetworkEmergency"))
+			mRestore.SetTooltip(i18n.T("main.turnEverythingOffAndRemove"))
+			mQuit.SetTitle(i18n.T("main.quit2"))
 			s := a.Snapshot()
 			icon, tip := "off", i18n.T("main.vpnerOff")
 			if s.Running {

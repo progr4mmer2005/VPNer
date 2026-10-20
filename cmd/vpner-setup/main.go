@@ -50,6 +50,7 @@ type setup struct {
 	appearance json.RawMessage
 	steps      []step
 	installing bool
+	lang       string // chosen in the wizard ("" = not chosen, keep the setting)
 	done       bool
 	err        string
 	lastPing   time.Time
@@ -81,6 +82,9 @@ func main() {
 		opts: install.Options{Dir: install.DefaultDir(), Desktop: true, StartMenu: true, Launch: true, Autostart: winutil.AutostartEnabled()}}
 	if cfg, err := store().Load(); err == nil {
 		st.appearance = cfg.Appearance // an update keeps the current look as the default choice
+		i18n.SetLang(i18n.Resolve(cfg.Settings.Language))
+	} else {
+		i18n.SetLang(i18n.Resolve(""))
 	}
 
 	tok := make([]byte, 24)
@@ -197,6 +201,21 @@ func (st *setup) routes(mux *http.ServeMux) {
 		defer st.mu.Unlock()
 		writeJSON(w, map[string]any{"version": version, "installed": installed, "running": install.Running(), "opts": st.opts})
 	})
+	mux.HandleFunc("POST /api/setup/lang", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Lang string `json:"lang"`
+		}
+		json.NewDecoder(io.LimitReader(r.Body, 4<<10)).Decode(&req)
+		if !i18n.Has(req.Lang) {
+			writeErr(w, fmt.Errorf("%s", req.Lang))
+			return
+		}
+		i18n.SetLang(req.Lang)
+		st.mu.Lock()
+		st.lang = req.Lang
+		st.mu.Unlock()
+		writeJSON(w, map[string]bool{"ok": true})
+	})
 	mux.HandleFunc("POST /api/setup/ping", func(w http.ResponseWriter, r *http.Request) {
 		st.mu.Lock()
 		st.lastPing = time.Now()
@@ -299,6 +318,11 @@ func (st *setup) saveLook(o install.Options) error {
 	}
 	st.mu.Unlock()
 	cfg.Settings.Autostart = o.Autostart
+	st.mu.Lock()
+	if st.lang != "" {
+		cfg.Settings.Language = st.lang
+	}
+	st.mu.Unlock()
 	os.MkdirAll(filepath.Dir(s.Path), 0o700)
 	return s.Save(cfg)
 }

@@ -116,6 +116,8 @@ type Settings struct {
 	// StartOnLaunch starts routing when the app starts (off by default: the
 	// program does nothing until the user presses "Включить").
 	StartOnLaunch bool `json:"startOnLaunch"`
+	// Language of the interface ("" = like Windows).
+	Language string `json:"language,omitempty"`
 	// Autostart launches VPNer at Windows logon (scheduled task, elevated).
 	Autostart bool `json:"autostart"`
 	// UIPort for the local web UI (0 = random).

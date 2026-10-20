@@ -1,0 +1,59 @@
+name: Release
+
+# Push a tag like v0.1.0 to build the installer and the portable zip and
+# publish them as a GitHub release (0.x and tags with "-" are pre-releases).
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache the Go toolchain
+        uses: actions/cache@v4
+        with:
+          path: .tools
+          key: tools-${{ hashFiles('build.ps1') }}
+
+      - name: Build
+        shell: pwsh
+        run: ./build.ps1 -Version $env:GITHUB_REF_NAME.TrimStart('v')
+
+      - name: Test
+        shell: pwsh
+        run: |
+          & .tools\go\bin\go.exe test ./...
+          if ($LASTEXITCODE) { exit 1 }
+
+      - name: Checksums and release notes
+        shell: pwsh
+        run: |
+          $files = 'vpner-setup.exe', 'VPNer-portable.zip', 'vpner.exe'
+          $files | ForEach-Object { "{0}  {1}" -f (Get-FileHash "dist\$_" -Algorithm SHA256).Hash.ToLower(), $_ } |
+            Set-Content -Encoding ascii dist\SHA256SUMS.txt
+          # the section of this version in CHANGELOG.md
+          $v = $env:GITHUB_REF_NAME.TrimStart('v')
+          $notes = @(); $in = $false
+          foreach ($l in Get-Content -Encoding utf8 CHANGELOG.md) {
+            if ($l -match '^## \[') { if ($in) { break }; $in = $l -match ('^## \[' + [regex]::Escape($v) + '\]'); continue }
+            if ($in) { $notes += $l }
+          }
+          if (-not $notes) { $notes = @("VPNer $v") }
+          $notes += '', 'See the [README](https://github.com/${{ github.repository }}#install) for installing; the files are not signed yet, so SmartScreen may ask to confirm.'
+          Set-Content -Encoding utf8 release-notes.md $notes
+
+      - name: Publish
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          $pre = @(); if ($tag -match '^v0\.' -or $tag -match '-') { $pre = @('--prerelease') }
+          gh release create $tag dist\vpner-setup.exe dist\VPNer-portable.zip dist\vpner.exe dist\SHA256SUMS.txt `
+            --title "VPNer $tag" --notes-file release-notes.md @pre

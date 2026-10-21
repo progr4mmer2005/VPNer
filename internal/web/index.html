@@ -796,14 +796,14 @@ function addPreset() {
 }
 
 const KINDS = [
-  ["process", tr("ui.program"), "chrome.exe\nTelegram.exe\nwork-*.exe", tr("ui.programFileNameStarIs")],
+  ["process", tr("ui.program"), "chrome.exe\nTeams.exe\nwork-*.exe", tr("ui.programFileNameStarIs")],
   ["process-path", tr("ui.programPath"), "C:\\Program Files\\Company\\*", tr("ui.fullPathStarMatchesAnything")],
-  ["domain-suffix", tr("ui.domainAndSubdomains"), "company.com\nyoutube.com", tr("ui.companyComAlsoCoversMail")],
+  ["domain-suffix", tr("ui.domainAndSubdomains"), "company.com\nclient.org", tr("ui.companyComAlsoCoversMail")],
   ["domain", tr("ui.exactDomain"), "chat.example.com", tr("ui.onlyThisDomainWithoutSubdomains")],
   ["domain-keyword", tr("ui.domainContains"), "google", tr("ui.anyDomainThatContainsWord")],
   ["domain-regex", tr("ui.domainRegex"), "^api\\d+\\.example\\.com$", tr("ui.regularExpression")],
   ["ip-cidr", tr("ui.ipSubnet"), "10.0.0.0/8\n192.168.50.10", tr("ui.addressesAndSubnetsNoDns")],
-  ["geosite", tr("ui.siteCategory"), "youtube\ntelegram\ngoogle\nopenai", tr("ui.readyMadeDomainListsGeosite")],
+  ["geosite", tr("ui.siteCategory"), "microsoft\ngithub\ngoogle", tr("ui.readyMadeDomainListsGeosite")],
   ["geoip", tr("ui.ipCountry"), "RU", tr("ui.countryCodeRuUsDe")],
   ["dst-port", tr("ui.destinationPort"), "25\n6881-6889", tr("ui.portOrRange")],
   ["network", tr("ui.protocol"), "udp", tr("ui.tcpOrUdp")],

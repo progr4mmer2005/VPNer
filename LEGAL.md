@@ -5,7 +5,7 @@
 This page explains, in plain words, which third-party software VPNer contains or downloads, what their licenses require and what they do not, how VPNer meets those requirements, and the terms on which VPNer itself is offered: no warranty, limitation of liability, your responsibility, privacy and trademarks.
 
 > [!NOTE]
-> This is the author's good-faith description, not legal advice. If something here is wrong or missing, please write to **jackjackjackjack024@gmail.com** and it will be fixed.
+> This is the author's good-faith description, not legal advice. If something here is wrong or missing, please open an [issue](../../issues/new/choose) and it will be fixed.
 
 ## In brief
 
@@ -169,8 +169,8 @@ Besides the traffic of your own programs, which goes where your rules send it, V
 
 - **Download and probe services.** GitHub, Alpine, Debian and Cloudflare see your IP address when files are downloaded or probes run, as with any download. Their own privacy policies apply.
 - **Donations.** If you donate on Boosty, Boosty's policy applies. The author sees only what Boosty shows: the name you choose and your message.
-- **Contacting the author.** If you write to the author by email or in an issue, your message is used only to answer it.
+- **Contacting the author.** If you write to the author in an issue or a security report, your message is used only to answer it.
 
 ## 9. Changes and contact
 
-This page may be updated together with VPNer; the current version is always in the repository, and changes are noted in the [changelog](CHANGELOG.md). Questions: **jackjackjackjack024@gmail.com**. Security problems: see [SECURITY.md](SECURITY.md).
+This page may be updated together with VPNer; the current version is always in the repository, and changes are noted in the [changelog](CHANGELOG.md). Questions: open an [issue](../../issues/new/choose). Security problems: see [SECURITY.md](SECURITY.md).

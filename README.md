@@ -146,7 +146,7 @@ If VPNer saves you time, you can support its development on **[Boosty](https://b
 > [!IMPORTANT]
 > **This project is entirely vibe-coded.** Every line of it was written by **Claude Opus 5.5** (Anthropic) in Claude Code, directed by the author. It works on the author's machine every day, but it is an early beta that has not been audited. Test it before you rely on it, especially the leak protection.
 
-Found a bug or have an idea? Open an [issue](../../issues/new/choose) or write to **jackjackjackjack024@gmail.com**. Security problems: see [SECURITY.md](SECURITY.md).
+Found a bug or have an idea? Open an [issue](../../issues/new/choose). Security problems are reported privately — see [SECURITY.md](SECURITY.md).
 
 There is no license yet: the code is published for review and testing. Ask the author before reusing it.
 

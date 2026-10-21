@@ -7,7 +7,7 @@ body:
       value: |
         Thanks for testing VPNer! Please do not paste keys, passwords or configs with secrets.
         Спасибо, что тестируете VPNer! Не вставляйте ключи, пароли и конфиги с секретами.
-        A leak or another security problem? Write to the email in SECURITY.md instead. / Утечка или другая проблема безопасности? Напишите на почту из SECURITY.md.
+        A leak or another security problem? Report it privately instead: Security tab, Report a vulnerability. / Утечка или другая проблема безопасности? Сообщите о ней закрыто: вкладка Security, Report a vulnerability.
   - type: textarea
     id: what
     attributes:

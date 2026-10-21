@@ -34,6 +34,10 @@ Set `VPNER_MIHOMO` to a `mihomo.exe` to also check generated configs against the
 | `internal/web` | the interface (one page) and its API |
 | `internal/install` | installing and uninstalling |
 
+## Dependencies
+
+Every module compiled into the programs needs its license in `internal/legal/THIRD_PARTY_NOTICES.txt`, which ships with every copy of VPNer. After changing `go.mod`, add the module to the list in `internal/legal/gen/main.go` and run `go generate ./internal/legal`; `go test ./internal/legal` fails until this is done. Only modules under permissive licenses (MIT, BSD, Apache-2.0, MPL-2.0 unmodified) can be compiled in. GPL programs such as mihomo are downloaded at run time and never bundled — see [LEGAL.md](LEGAL.md#3-components-that-vpner-downloads).
+
 ## Translations
 
 All texts live in `internal/i18n/locales/<lang>.json`; code refers to them by key (`i18n.T("app.routingIsOn")` in Go, `tr("ui.rules")` and `data-i18n` in the page). To add a language, copy `en.json` to `<lang>.json`, translate the values (keep `%s`/`%v`/`%d` placeholders in the same order) and set `meta.name` to the language's own name. `go test ./internal/i18n` checks that every key is there, that placeholders match and that no text is left in the code.

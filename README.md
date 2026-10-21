@@ -63,6 +63,7 @@ Download from [Releases](../../releases/latest):
 |---|---|
 | `vpner-setup.exe` | Installer: choose a language and a theme, shortcuts, an entry in "Installed apps" |
 | `VPNer-portable.zip` | Portable: unpack anywhere and run `vpner.exe`; everything stays in the `data` folder next to it |
+| `THIRD_PARTY_NOTICES.txt` | Licenses of the open-source components inside VPNer (also included in the installer and the zip) |
 | `SHA256SUMS.txt` | Checksums of the files |
 
 The files are not signed yet, so Windows SmartScreen may say "Windows protected your PC": click **More info → Run anyway**.
@@ -145,6 +146,12 @@ If VPNer saves you time, you can support its development on **[Boosty](https://b
 > [!IMPORTANT]
 > **This project is entirely vibe-coded.** Every line of it was written by **Claude Opus 5.5** (Anthropic) in Claude Code, directed by the author. It works on the author's machine every day, but it is an early beta that has not been audited. Test it before you rely on it, especially the leak protection.
 
-Found a bug or have an idea? Open an [issue](../../issues/new/choose) or write to **jackjackjackjack024@gmail.com**. Security problems: see [SECURITY.md](SECURITY.md).
+Found a bug or have an idea? Open an [issue](../../issues/new/choose). Security problems are reported privately — see [SECURITY.md](SECURITY.md).
 
 There is no license yet: the code is published for review and testing. Ask the author before reusing it.
+
+## Legal
+
+VPNer is free and provided **"as is", without any warranty**; the author is not liable for any damage from its use. You are responsible for following the rules of your organization and the law. VPNer collects no data. The open-source components inside VPNer and their licenses, the components it downloads (such as the GPL-3.0 mihomo engine, which is not bundled), the full warranty disclaimer, the privacy details and the list of network requests are in **[LEGAL.md](LEGAL.md)**.
+
+Cisco, AnyConnect, GlobalProtect, Fortinet, Pulse Secure, Ivanti, F5, OpenVPN, WireGuard, AmneziaWG, Windows and other names are trademarks of their owners and are used only to describe compatibility. VPNer is an independent project, not affiliated with or endorsed by these companies.

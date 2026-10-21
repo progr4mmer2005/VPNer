@@ -254,6 +254,7 @@ a, img, svg { -webkit-user-drag: none; }
 .drop { border: 1.5px dashed var(--line); border-radius: var(--radius); padding: 14px; display: flex; flex-direction: column; gap: 8px; }
 .drop.over { border-color: var(--accent); background: var(--accent-weak); }
 details > summary { cursor: pointer; color: var(--muted); margin: 6px 0 12px; user-select: none; }
+.logs.legal-text { height: min(60vh, 520px); margin: 0; padding: 10px 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .logs { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); font-family: var(--mono); font-size: 12px; height: calc(100vh - 230px); overflow: auto; padding: 8px 0; }
 .logs div { padding: 1px 12px; white-space: pre-wrap; word-break: break-word; }
 .logs .t { color: var(--muted); }
@@ -928,6 +929,20 @@ function showQuitConfirm() {
   $("#q-stay", m).onclick = async () => { close(); await api("POST", "/api/quit/cancel").catch(() => {}); };
   $("#q-go", m).onclick = async () => { $("#q-go", m).disabled = true; $("#q-go", m).textContent = tr("ui.disconnecting"); await doQuit(); };
 }
+async function legalDialog() {
+  let text;
+  try {
+    const r = await fetch("/api/legal", { headers: { "X-Token": TOKEN } });
+    if (!r.ok) throw new Error(r.statusText);
+    text = await r.text();
+  } catch (e) { toast(e.message, true); return; }
+  modal(`<header><h3>${tr("ui.legal.licenses")}</h3><button class="icon-btn" onclick="closeModal()" aria-label="${tr("ui.close")}">${ICON.close}</button></header>
+    <div class="body">
+      <p class="help" style="color:var(--muted);font-size:12.5px;margin-top:0">${tr("ui.legal.licensesIntro")}</p>
+      <pre class="logs legal-text">${esc(text)}</pre>
+    </div>
+    <footer><button class="btn primary" onclick="closeModal()">${tr("ui.close")}</button></footer>`, { wide: true });
+}
 async function restoreNet() { await act(() => api("POST", "/api/restore"), tr("ui.networkRestored")); }
 
 // ---------- appearance: themes, user values, variables, effects ----------
@@ -1396,6 +1411,7 @@ function renderSetup() {
       <div class="field" style="margin-top:14px"><span>${tr("ui.folder")}</span><input type="text" id="wz-dir" value="${esc(o.dir)}" spellcheck="false"><span class="help">${tr("ui.settingsAndConnectionsAreKept")}</span></div>
       ${[["startMenu", tr("ui.startMenuShortcut")], ["desktop", tr("ui.desktopShortcut")], ["autostart", tr("ui.startWithWindows"), tr("ui.minimizedToTrayWithoutUac")], ["launch", tr("ui.launchVpnerAfterInstalling")]]
         .map(([k, l, h]) => `<label class="check wiz-opt"><input type="checkbox" class="switch" data-opt="${k}" ${o[k] ? "checked" : ""}><span><b style="font-size:13px">${l}</b>${h ? `<br><span style="color:var(--muted);font-size:12.5px">${h}</span>` : ""}</span></label>`).join("")}
+      <p class="help" style="color:var(--muted);font-size:12.5px;margin:14px 0 0">${tr("ui.setup.asIs")}</p>
       ${SETUP.info.running ? `<div class="banner warn" style="margin:14px 0 0">${tr("ui.vpnerIsRunningNowInstaller")}</div>` : ""}`;
     foot = `<button class="btn" data-go="theme">${tr("ui.back")}</button><button class="btn primary big" id="wz-install">${SETUP.info.installed ? tr("ui.update") : tr("ui.install")}</button>`;
   } else if (st === "install" || st === "done") {
@@ -2387,6 +2403,10 @@ async function renderSettings() {
     <div class="panel"><h3>${tr("ui.maintenance")}</h3>
       <div class="row"><button class="btn danger" onclick="restoreNet()">${tr("ui.restoreNetworkEmergency")}</button><span class="help" style="color:var(--muted);font-size:12.5px">${tr("ui.turnsRoutingOffAndRemoves")}</span></div>
       <p class="help" style="color:var(--muted);font-size:12.5px;margin-bottom:0">${tr("ui.settings.dataDir", esc(S.info.version || ""), `<span class="mono">${esc(S.cfg.dataDir)}</span>`, esc(S.info.mihomo || ""))}</p>
+    </div>
+    <div class="panel"><h3>${tr("ui.legal.title")}</h3>
+      <p class="help" style="color:var(--muted);font-size:12.5px;margin-top:0">${tr("ui.legal.text")}</p>
+      <div class="row"><button class="btn" onclick="legalDialog()">${tr("ui.legal.licenses")}</button><span class="help" style="color:var(--muted);font-size:12.5px">${tr("ui.legal.more")}</span></div>
     </div>`;
   const save = async () => {
     const ns = { ...S.cfg.settings };

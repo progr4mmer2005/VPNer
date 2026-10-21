@@ -4,7 +4,7 @@ VPNer handles VPN credentials and decides where your traffic goes, so leaks and 
 
 ## Reporting
 
-Please **do not open a public issue** for a vulnerability or a leak. Write to **jackjackjackjack024@gmail.com** with:
+Please **do not open a public issue** for a vulnerability or a leak. Report it privately on GitHub: the **Security** tab of the repository → **Report a vulnerability** ([direct link](../../security/advisories/new)). Only the author sees the report. Include:
 
 - what happens and what you expected;
 - the version (Settings shows it, or `vpner.exe version`) and Windows version;

@@ -25,6 +25,7 @@ import (
 	"vpner/internal/app"
 	"vpner/internal/config"
 	"vpner/internal/deps"
+	"vpner/internal/legal"
 	"vpner/internal/providers"
 	"vpner/internal/winutil"
 )
@@ -478,6 +479,10 @@ func (s *Server) routes(mux *http.ServeMux) {
 			return
 		}
 		writeJSON(w, map[string]string{"output": out})
+	})
+	mux.HandleFunc("GET /api/legal", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		io.WriteString(w, legal.Notices)
 	})
 	mux.HandleFunc("GET /api/info", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]any{

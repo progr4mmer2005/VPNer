@@ -34,7 +34,7 @@ jobs:
       - name: Checksums and release notes
         shell: pwsh
         run: |
-          $files = 'vpner-setup.exe', 'VPNer-portable.zip', 'vpner.exe'
+          $files = 'vpner-setup.exe', 'VPNer-portable.zip', 'vpner.exe', 'THIRD_PARTY_NOTICES.txt'
           $files | ForEach-Object { "{0}  {1}" -f (Get-FileHash "dist\$_" -Algorithm SHA256).Hash.ToLower(), $_ } |
             Set-Content -Encoding ascii dist\SHA256SUMS.txt
           # the section of this version in CHANGELOG.md
@@ -55,5 +55,5 @@ jobs:
         run: |
           $tag = $env:GITHUB_REF_NAME
           $pre = @(); if ($tag -match '^v0\.' -or $tag -match '-') { $pre = @('--prerelease') }
-          gh release create $tag dist\vpner-setup.exe dist\VPNer-portable.zip dist\vpner.exe dist\SHA256SUMS.txt `
+          gh release create $tag dist\vpner-setup.exe dist\VPNer-portable.zip dist\vpner.exe dist\THIRD_PARTY_NOTICES.txt dist\SHA256SUMS.txt `
             --title "VPNer $tag" --notes-file release-notes.md @pre

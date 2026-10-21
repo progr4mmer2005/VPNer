@@ -22,6 +22,7 @@ import (
 	"vpner/internal/app"
 	"vpner/internal/firewall"
 	"vpner/internal/install"
+	"vpner/internal/legal"
 	"vpner/internal/web"
 	"vpner/internal/winutil"
 )
@@ -72,6 +73,10 @@ func main() {
 	case "version":
 		winutil.AttachParentConsole()
 		fmt.Println("VPNer", version)
+		return
+	case "licenses":
+		winutil.AttachParentConsole()
+		fmt.Print(legal.Notices)
 		return
 	case "help", "/?":
 		winutil.AttachParentConsole()

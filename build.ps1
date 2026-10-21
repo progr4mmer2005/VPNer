@@ -2,7 +2,7 @@
 #   powershell -ExecutionPolicy Bypass -File build.ps1 [-Arch amd64|arm64|all] [-Version 0.1.0]
 param(
     [ValidateSet('amd64', 'arm64', 'all')][string]$Arch = 'amd64',
-    [string]$Version = '0.1.0'
+    [string]$Version = '0.1.1'
 )
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
@@ -83,10 +83,13 @@ foreach ($a in $targets) {
     Remove-Item -Recurse -Force "build\portable-$a" -ErrorAction SilentlyContinue
     New-Item -ItemType Directory -Force "$stage\data" | Out-Null
     Copy-Item $out "$stage\vpner.exe"
+    Copy-Item internal\legal\THIRD_PARTY_NOTICES.txt "$stage\THIRD_PARTY_NOTICES.txt"
     Copy-Item packaging\portable-data-README.txt "$stage\data\README.txt"
     Remove-Item $zip -ErrorAction SilentlyContinue
     Compress-Archive -Path $stage -DestinationPath $zip
     Write-Host ("  -> {0} ({1:N1} MB)" -f $zip, ((Get-Item $zip).Length / 1MB))
 }
 Remove-Item Env:GOOS, Env:GOARCH
+# the licenses of the components built into the programs, published with them
+Copy-Item internal\legal\THIRD_PARTY_NOTICES.txt dist\THIRD_PARTY_NOTICES.txt
 Write-Host 'Done.'

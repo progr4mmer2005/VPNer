@@ -24,6 +24,7 @@ import (
 	"golang.org/x/sys/windows/registry"
 
 	"vpner/internal/firewall"
+	"vpner/internal/legal"
 )
 
 const (
@@ -100,6 +101,10 @@ func Install(payload []byte, version string, o Options, step func(string)) error
 	if err := os.Rename(tmp, exe); err != nil {
 		os.Remove(tmp)
 		return fmt.Errorf(i18n.T("install.replacingProgram"), err)
+	}
+	// the licenses of the components inside the program travel with it
+	if err := os.WriteFile(filepath.Join(dir, legal.FileName), []byte(legal.Notices), 0o644); err != nil {
+		return fmt.Errorf(i18n.T("install.writingProgram"), err)
 	}
 	step(i18n.T("install.registeringInWindowsInstalledApps"))
 	if err := register(dir, exe, version, len(payload)); err != nil {
@@ -266,6 +271,7 @@ func Uninstall(removeData bool) error {
 		dir = filepath.Dir(exe)
 	}
 	target := filepath.Join(dir, ExeName)
+	os.Remove(filepath.Join(dir, legal.FileName))
 	if strings.EqualFold(filepath.Clean(exe), filepath.Clean(target)) {
 		cmd := hidden(exec.Command("cmd.exe", "/C", fmt.Sprintf(`ping -n 3 127.0.0.1 >nul & del /f /q "%s" & rmdir "%s"`, target, dir)))
 		return cmd.Start()

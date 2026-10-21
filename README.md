@@ -17,11 +17,11 @@ Every program, site and IP goes through the connection you choose.
 
 ## What it is
 
-Corporate Cisco for work, OpenVPN for another client, AmneziaWG for everything else — normally these VPNs fight over routes, DNS and kill switches, and traffic of one leaks through another. VPNer runs them **side by side, each in isolation**, and sends traffic by your rules:
+A corporate Cisco for your job, OpenVPN into a client's network, your own WireGuard or AmneziaWG to your home network or servers — normally these VPNs fight over routes, DNS and kill switches, and traffic of one leaks through another. VPNer runs them **side by side, each in isolation**, and sends traffic by your rules:
 
-- `jira.company.com`, `10.20.0.0/16` → the work Cisco;
+- `jira.company.com`, `10.20.0.0/16`, `Teams.exe` → the work Cisco;
 - `intranet.office.lan` → the office OpenVPN;
-- `claude.ai`, `Telegram.exe`, the `youtube` category → Amnezia;
+- `nas.home.lan`, `192.168.50.0/24` → your personal VPN;
 - everything else → directly.
 
 If a VPN goes down, its rules **block** traffic instead of letting it out directly.
@@ -32,7 +32,7 @@ If a VPN goes down, its rules **block** traffic instead of letting it out direct
   - **built in:** WireGuard, AmneziaWG (including 2.0 and the full access key of your own Amnezia server), VLESS/Reality, VMess, Trojan, Shadowsocks, Hysteria2, TUIC;
   - **in isolated WSL containers:** Cisco AnyConnect / Secure Client (OpenConnect), GlobalProtect, Fortinet, Pulse/Ivanti, F5, OpenVPN;
   - **in a Hyper-V virtual machine:** any original VPN app (AmneziaVPN, Cisco Secure Client, provider clients).
-- **Rules:** by program, program path, domain, domain suffix, keyword, regex, IP/subnet, site category (geosite), IP country, port and protocol. Ready-made sets (AI services, YouTube, Telegram, Discord, Meta, X), drag & drop ordering, a "where will it go?" check.
+- **Rules:** by program, program path, domain, domain suffix, keyword, regex, IP/subnet, site category (geosite), IP country, port and protocol. Ready-made sets of popular services, drag & drop ordering, a "where will it go?" check.
 - **DNS:** DoH, DoH3, DoT, DoQ, UDP/TCP and the system resolver; each server can go directly or **through any VPN**; per-domain DNS rules; FakeIP so that DNS never leaks.
 - **Logins:** saved passwords (encrypted with DPAPI), MFA codes, push confirmations (Duo, Telegram bots…), SAML/SSO in the browser. Corporate VPNs log in one at a time, so their push requests do not collide; idle sessions are kept alive.
 - **Import:** a `vpn://` key, `.conf`, `.ovpn`, share links, subscriptions (Happ, v2rayN, Hiddify, Clash), a whole Clash/mihomo config, or a VPNer profile.
@@ -131,14 +131,14 @@ The script downloads a pinned Go toolchain into `.tools`, builds the Linux agent
 
 ## Author
 
-**programmer2005** — just a student who needed several VPNs at once for work: corporate ones plus a personal one for AI services. They kept conflicting with each other, and that is how VPNer appeared.
+**programmer2005** — just a student who needed several VPNs at once for work: a few corporate ones plus a personal one. They kept conflicting with each other, and that is how VPNer appeared.
 
 - Telegram: [@programmer2005](https://t.me/programmer2005)
 - GitHub: [progr4mmer2005](https://github.com/progr4mmer2005)
 
 ## Support the project
 
-If VPNer saves you time, you can support its development on **[Boosty](https://boosty.to/programmer2005)** — any amount helps.
+If VPNer saves you time, you can support its development on **[Boosty](https://boosty.to/programmer2005/donate)** — any amount helps.
 
 ## Project status
 

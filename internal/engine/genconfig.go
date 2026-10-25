@@ -59,6 +59,10 @@ func IsLAN(ip net.IP) bool {
 	return false
 }
 
+// fakeIPRange holds the addresses the engine hands out in FakeIP mode. They
+// lead nowhere outside the engine.
+const fakeIPRange = "198.18.0.1/16"
+
 // OutboundFor names the engine outbound that traffic for a rule target goes
 // to; known holds the outbounds present in the config.
 func OutboundFor(target string, known map[string]bool) string {
@@ -251,6 +255,17 @@ func Generate(in GenInput) (map[string]any, error) {
 // taken from the start of the connection (TLS/QUIC SNI, HTTP Host) and used
 // only for rule matching; the connection still goes to the same IP.
 // Connections opened by name (FakeIP) already carry it and are not sniffed.
+//
+// A FakeIP address the engine no longer knows (left in a program's DNS cache
+// after an engine restart) is skipped rather than sniffed. Sniffing it gives
+// the connection a rule from the site name, but without overriding the
+// destination it is then dialed to the fake address and hangs until it times
+// out. Overriding only these is impossible: the engine switches the override
+// per protocol, not per address, and overriding everything would send
+// connections whose site name is a decoy (VLESS Reality clients, domain
+// fronting) to that site instead of to their own server. Skipped, the engine
+// drops the connection at once and the program asks DNS again, getting a
+// FakeIP the engine knows.
 func sniffer() map[string]any {
 	keep := false
 	return map[string]any{
@@ -258,6 +273,7 @@ func sniffer() map[string]any {
 		"parse-pure-ip":        true,
 		"force-dns-mapping":    false,
 		"override-destination": keep,
+		"skip-dst-address":     []string{fakeIPNet()},
 		"sniff": map[string]any{
 			"TLS":  map[string]any{"ports": []string{"443", "8443"}, "override-destination": keep},
 			"QUIC": map[string]any{"ports": []string{"443", "8443"}, "override-destination": keep},
@@ -395,6 +411,11 @@ func ruleLines(r config.Rule, tgt string) ([]string, error) {
 	return out, nil
 }
 
+func fakeIPNet() string {
+	_, n, _ := net.ParseCIDR(fakeIPRange)
+	return n.String()
+}
+
 // NormalizeDomain turns a domain rule value into the name the engine matches.
 func NormalizeDomain(v string) string { return normalizeDomain(v) }
 
@@ -517,7 +538,7 @@ func buildDNS(d config.DNS) map[string]any {
 		"enable":                  true,
 		"ipv6":                    false,
 		"enhanced-mode":           mode,
-		"fake-ip-range":           "198.18.0.1/16",
+		"fake-ip-range":           fakeIPRange,
 		"use-system-hosts":        true,
 		"default-nameserver":      []string{"system"},
 		"nameserver":              nameservers,

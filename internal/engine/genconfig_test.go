@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"net"
 	"os"
 	"strings"
 	"testing"
@@ -89,6 +90,29 @@ func TestSnifferForBareIPs(t *testing.T) {
 		if p == nil || !strings.Contains(strings.Join(p["ports"].([]string), ","), port) || p["override-destination"] != false {
 			t.Errorf("sniff %s = %v", proto, p)
 		}
+	}
+}
+
+// A FakeIP address the engine no longer knows must not be sniffed: with the
+// destination kept it would be dialed to the fake address and hang. Skipped,
+// the engine drops it at once and the program asks DNS again. Real addresses
+// are still sniffed and keep their destination.
+func TestSnifferSkipsStaleFakeIPs(t *testing.T) {
+	m, err := Generate(GenInput{Cfg: testConfig(), ControllerPort: 9090, Secret: "s"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sn := m["sniffer"].(map[string]any)
+	skip, _ := sn["skip-dst-address"].([]string)
+	_, fake, err := net.ParseCIDR(m["dns"].(map[string]any)["fake-ip-range"].(string))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(skip) != 1 || skip[0] != fake.String() {
+		t.Errorf("skip-dst-address = %v, want the FakeIP range %s only", skip, fake)
+	}
+	if sn["override-destination"] != false {
+		t.Error("real addresses must keep their destination")
 	}
 }
 

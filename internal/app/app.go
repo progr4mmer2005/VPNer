@@ -66,6 +66,11 @@ type App struct {
 	// into the connection once the tunnel comes up with it.
 	typedPass map[string]string
 
+	// routed is the routing the engine runs now; applyMu keeps config
+	// applies and the reroute after each of them in order.
+	routed  *routes
+	applyMu sync.Mutex
+
 	changed chan struct{} // signals UI that the snapshot changed
 	subMu   sync.Mutex
 	subs    map[chan struct{}]struct{}
@@ -577,7 +582,8 @@ func (a *App) startLocked() error {
 	if err := a.syncTunnels(false); err != nil {
 		a.Log.Errorf("app", i18n.T("app.tunnelProcessTunnelsWillRun"), err)
 	}
-	conf, err := a.genConfig()
+	cfg := a.Config()
+	conf, err := a.genConfigFor(cfg)
 	if err != nil {
 		return err
 	}
@@ -589,6 +595,7 @@ func (a *App) startLocked() error {
 	if err := m.Start(conf); err != nil {
 		return err
 	}
+	a.setRouted(newRoutes(cfg, conf))
 	v, _ := m.Version()
 	a.Log.Infof("app", i18n.T("app.mihomoEngineStarted"), v)
 	go a.watchEngine(m)
@@ -642,11 +649,13 @@ func (a *App) watchEngine(m *engine.Mihomo) {
 		if !still {
 			return
 		}
-		conf, err := a.genConfig()
+		cfg := a.Config()
+		conf, err := a.genConfigFor(cfg)
 		if err == nil {
 			err = m.Start(conf)
 		}
 		if err == nil {
+			a.setRouted(newRoutes(cfg, conf))
 			a.Log.Infof("app", "%s", i18n.T("app.engineRestarted"))
 			go a.watchEngine(m)
 			return
@@ -703,6 +712,8 @@ func (a *App) EmergencyRestore() error {
 }
 
 func (a *App) applyEngine() error {
+	a.applyMu.Lock()
+	defer a.applyMu.Unlock()
 	a.mu.Lock()
 	m := a.engine
 	running := a.running || a.starting
@@ -713,14 +724,39 @@ func (a *App) applyEngine() error {
 	if err := a.syncTunnels(false); err != nil {
 		a.Log.Errorf("app", i18n.T("app.tunnelProcess"), err)
 	}
-	conf, err := a.genConfig()
+	cfg := a.Config()
+	conf, err := a.genConfigFor(cfg)
 	if err != nil {
 		return err
 	}
 	if err := m.Test(conf); err != nil {
 		return err
 	}
-	return m.Apply(conf)
+	if err := m.Apply(conf); err != nil {
+		return err
+	}
+	// Connections opened before the change keep their old route: close the
+	// ones whose route is now different (see reroute.go).
+	cur := newRoutes(cfg, conf)
+	a.reroute(m, a.setRouted(cur), cur)
+	return nil
+}
+
+// setRouted records the routing the engine now runs and returns the
+// previous one.
+func (a *App) setRouted(r *routes) *routes {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	prev := a.routed
+	a.routed = r
+	return prev
+}
+
+// selfProcesses are VPNer's own programs: their traffic always goes
+// directly and is never rerouted.
+func selfProcesses() []string {
+	exe, _ := os.Executable()
+	return []string{filepath.Base(exe), "mihomo.exe"}
 }
 
 func loopbackIface() string {
@@ -733,8 +769,8 @@ func loopbackIface() string {
 	return ""
 }
 
-func (a *App) genConfig() (map[string]any, error) {
-	cfg := a.Config()
+// genConfigFor generates the engine config for cfg.
+func (a *App) genConfigFor(cfg *config.Config) (map[string]any, error) {
 	a.mu.Lock()
 	m := a.engine
 	eps := map[string]engine.LocalEndpoint{}
@@ -763,12 +799,14 @@ func (a *App) genConfig() (map[string]any, error) {
 	if m == nil {
 		return nil, errors.New(i18n.T("app.engineIsNotRunning"))
 	}
-	cfg.Settings.LogLevel = "debug" // filtered in engineLog
-	exe, _ := os.Executable()
+	// The engine logs everything and engineLog filters it; the copy keeps
+	// the user's level for the routing record.
+	gen := *cfg
+	gen.Settings.LogLevel = "debug"
 	return engine.Generate(engine.GenInput{
-		Cfg: cfg, Endpoints: eps, ControllerPort: m.Port, Secret: m.Secret,
+		Cfg: &gen, Endpoints: eps, ControllerPort: m.Port, Secret: m.Secret,
 		LoopbackIface: loopbackIface(), TestPorts: tp,
-		SelfProcesses: []string{filepath.Base(exe), "mihomo.exe"},
+		SelfProcesses: selfProcesses(),
 		NoIPv6:        !hasIPv6(),
 	})
 }

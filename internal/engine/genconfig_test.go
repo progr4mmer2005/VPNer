@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"net"
 	"os"
 	"strings"
 	"testing"
@@ -88,6 +89,49 @@ func TestSnifferForBareIPs(t *testing.T) {
 		p, _ := sn["sniff"].(map[string]any)[proto].(map[string]any)
 		if p == nil || !strings.Contains(strings.Join(p["ports"].([]string), ","), port) || p["override-destination"] != false {
 			t.Errorf("sniff %s = %v", proto, p)
+		}
+	}
+}
+
+// A FakeIP address the engine no longer knows must not be sniffed: with the
+// destination kept it would be dialed to the fake address and hang. Skipped,
+// the engine drops it at once and the program asks DNS again. Real addresses
+// are still sniffed and keep their destination.
+func TestSnifferSkipsStaleFakeIPs(t *testing.T) {
+	m, err := Generate(GenInput{Cfg: testConfig(), ControllerPort: 9090, Secret: "s"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sn := m["sniffer"].(map[string]any)
+	skip, _ := sn["skip-dst-address"].([]string)
+	_, fake, err := net.ParseCIDR(m["dns"].(map[string]any)["fake-ip-range"].(string))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(skip) != 1 || skip[0] != fake.String() {
+		t.Errorf("skip-dst-address = %v, want the FakeIP range %s only", skip, fake)
+	}
+	if sn["override-destination"] != false {
+		t.Error("real addresses must keep their destination")
+	}
+}
+
+// The outbound a rule target maps to is what live connections are compared
+// with when rules change.
+func TestOutboundFor(t *testing.T) {
+	m, err := Generate(GenInput{Cfg: testConfig(), ControllerPort: 9090, Secret: "s"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	known := Outbounds(m)
+	for target, want := range map[string]string{
+		config.TargetDirect: "direct-out", config.TargetBlock: "REJECT", "": "REJECT",
+		"cnl":   "cnl",    // native outbound, always present
+		"cwork": "REJECT", // WSL connection without an endpoint: not running
+		"gone":  "REJECT",
+	} {
+		if got := OutboundFor(target, known); got != want {
+			t.Errorf("OutboundFor(%q) = %q, want %q", target, got, want)
 		}
 	}
 }

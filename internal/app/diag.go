@@ -10,7 +10,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -165,68 +164,12 @@ func (a *App) CheckRoute(host, process string) RouteCheck {
 	if h, _, err := net.SplitHostPort(host); err == nil {
 		host = h
 	}
-	process = strings.ToLower(strings.TrimSpace(process))
-	ip := net.ParseIP(host)
-	var notes []string
-	for _, r := range cfg.Rules {
-		if !r.Enabled {
-			continue
-		}
-		for _, raw := range r.Values {
-			v := strings.ToLower(strings.TrimSpace(raw))
-			if v == "" {
-				continue
-			}
-			hit := false
-			switch r.Kind {
-			case config.RuleProcess:
-				if process != "" {
-					hit = globMatch(v, process)
-				}
-			case config.RuleProcessPath:
-				if process != "" && strings.Contains(v, `\`) {
-					hit = globMatch(v, process) || strings.HasSuffix(v, `\`+process)
-				}
-			case config.RuleDomain:
-				d := strings.TrimPrefix(v, "*.")
-				hit = ip == nil && (host == d || (strings.HasPrefix(v, "*.") && strings.HasSuffix(host, "."+d)))
-			case config.RuleDomainSuffix:
-				d := strings.TrimPrefix(strings.TrimPrefix(v, "*."), ".")
-				hit = ip == nil && (host == d || strings.HasSuffix(host, "."+d))
-			case config.RuleDomainKeyword:
-				hit = ip == nil && strings.Contains(host, v)
-			case config.RuleDomainRegex:
-				if re, err := regexp.Compile(raw); err == nil {
-					hit = ip == nil && re.MatchString(host)
-				}
-			case config.RuleIPCIDR:
-				if ip != nil {
-					c := v
-					if !strings.Contains(c, "/") {
-						c += "/32"
-					}
-					if _, n, err := net.ParseCIDR(c); err == nil {
-						hit = n.Contains(ip)
-					}
-				}
-			case config.RuleGeoSite, config.RuleGeoIP:
-				notes = append(notes, fmt.Sprintf(i18n.T("app.ruleIsCheckedByEngine"), r.Kind, v))
-			}
-			if hit {
-				return RouteCheck{Target: r.Target, TargetName: a.ConnName(r.Target), Rule: fmt.Sprintf("%s: %s", kindTitle(r.Kind), raw), Note: strings.Join(notes, "; ")}
-			}
-		}
+	q := routeQuery{process: strings.ToLower(strings.TrimSpace(process))}
+	if q.ip = net.ParseIP(host); q.ip == nil {
+		q.host = host
 	}
-	if cfg.Settings.AllowLAN && ip != nil && (ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLoopback()) {
-		return RouteCheck{Target: config.TargetDirect, TargetName: a.ConnName(config.TargetDirect), Rule: i18n.T("app.localNetwork")}
-	}
-	return RouteCheck{Target: cfg.Settings.FinalTarget, TargetName: a.ConnName(cfg.Settings.FinalTarget), Rule: i18n.T("app.defaultRule"), Note: strings.Join(notes, "; ")}
-}
-
-func globMatch(pattern, s string) bool {
-	re := "^" + strings.ReplaceAll(strings.ReplaceAll(regexp.QuoteMeta(pattern), `\*`, ".*"), `\?`, ".") + "$"
-	ok, _ := regexp.MatchString(re, s)
-	return ok
+	h := route(cfg, q, false)
+	return RouteCheck{Target: h.target, TargetName: a.ConnName(h.target), Rule: h.rule, Note: strings.Join(h.notes, "; ")}
 }
 
 func kindTitle(k string) string {

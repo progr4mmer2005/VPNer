@@ -2,7 +2,7 @@
 #   powershell -ExecutionPolicy Bypass -File build.ps1 [-Arch amd64|arm64|all] [-Version 0.1.0]
 param(
     [ValidateSet('amd64', 'arm64', 'all')][string]$Arch = 'amd64',
-    [string]$Version = '0.1.1'
+    [string]$Version = '0.1.2'
 )
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'

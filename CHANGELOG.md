@@ -4,8 +4,12 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-10-25
+
 ### Fixed
 
+- Rule changes now reach connections that are already open: after saving, VPNer closes the open connections whose route is different under the new rules, and the programs open them again on the new route. Before, a browser reusing a connection kept the old route until it was closed by hand. Connections whose route did not change, and VPNer's own, stay open.
+- Connections to a FakeIP address left in a program's DNS cache after an engine restart are dropped at once, so the program asks DNS again, instead of hanging until a timeout.
 - Domain rules now also work for programs that resolve names on their own (DNS over HTTPS in browsers, the browser inside apps) and connect to a bare IP: the site name is taken from the connection itself (TLS/QUIC SNI, HTTP Host). Before, such connections fell through to program rules or went directly.
 
 ### Changed

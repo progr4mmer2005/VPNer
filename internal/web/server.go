@@ -305,6 +305,24 @@ func (s *Server) routes(mux *http.ServeMux) {
 
 	// Export into a file chosen in the standard Windows "Save as" dialog
 	// (instead of a browser download).
+	// The profile as text, for the export window: the user copies it or saves
+	// it to a file from there.
+	mux.HandleFunc("POST /api/export", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Secrets bool `json:"secrets"`
+		}
+		if err := readJSON(r, &req); err != nil {
+			writeErr(w, err)
+			return
+		}
+		data, err := s.App.Export(req.Secrets)
+		if err != nil {
+			writeErr(w, err)
+			return
+		}
+		w.Header().Set("Cache-Control", "no-store")
+		writeJSON(w, map[string]any{"text": string(data)})
+	})
 	mux.HandleFunc("POST /api/export/save", func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
 			Secrets bool `json:"secrets"`

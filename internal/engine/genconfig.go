@@ -198,6 +198,7 @@ func Generate(in GenInput) (map[string]any, error) {
 		"geo-update-interval": 72,
 		"profile":             map[string]any{"store-selected": false, "store-fake-ip": true},
 		"dns":                 dnsSection,
+		"sniffer":             sniffer(),
 		"proxies":             proxies,
 		"listeners":           listeners,
 		"rules":               rules,
@@ -215,6 +216,27 @@ func Generate(in GenInput) (map[string]any, error) {
 		}
 	}
 	return m, nil
+}
+
+// sniffer lets domain rules work for programs that resolve names on their
+// own (DNS over HTTPS in browsers, the browser inside apps): they connect to
+// a bare IP that the engine has never seen a DNS query for. The site name is
+// taken from the start of the connection (TLS/QUIC SNI, HTTP Host) and used
+// only for rule matching; the connection still goes to the same IP.
+// Connections opened by name (FakeIP) already carry it and are not sniffed.
+func sniffer() map[string]any {
+	keep := false
+	return map[string]any{
+		"enable":               true,
+		"parse-pure-ip":        true,
+		"force-dns-mapping":    false,
+		"override-destination": keep,
+		"sniff": map[string]any{
+			"TLS":  map[string]any{"ports": []string{"443", "8443"}, "override-destination": keep},
+			"QUIC": map[string]any{"ports": []string{"443", "8443"}, "override-destination": keep},
+			"HTTP": map[string]any{"ports": []string{"80", "8080-8880"}, "override-destination": keep},
+		},
+	}
 }
 
 // TunnelInput describes the tunnel process: a separate engine instance that

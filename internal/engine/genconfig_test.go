@@ -69,6 +69,29 @@ func TestDNSGeneration(t *testing.T) {
 	}
 }
 
+// Programs with their own DNS connect to bare IPs: the engine must take the
+// site name from the connection for domain rules, without changing where the
+// connection goes.
+func TestSnifferForBareIPs(t *testing.T) {
+	m, err := Generate(GenInput{Cfg: testConfig(), ControllerPort: 9090, Secret: "s"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sn, ok := m["sniffer"].(map[string]any)
+	if !ok || sn["enable"] != true || sn["parse-pure-ip"] != true {
+		t.Fatalf("sniffer must be on for bare IPs: %v", m["sniffer"])
+	}
+	if sn["force-dns-mapping"] != false || sn["override-destination"] != false {
+		t.Errorf("sniffing must not touch FakeIP connections or the destination: %v", sn)
+	}
+	for proto, port := range map[string]string{"TLS": "443", "QUIC": "443", "HTTP": "80"} {
+		p, _ := sn["sniff"].(map[string]any)[proto].(map[string]any)
+		if p == nil || !strings.Contains(strings.Join(p["ports"].([]string), ","), port) || p["override-destination"] != false {
+			t.Errorf("sniff %s = %v", proto, p)
+		}
+	}
+}
+
 func TestDNSValidation(t *testing.T) {
 	cfg := testConfig()
 	cfg.DNS.Servers = append(cfg.DNS.Servers, config.DNSServer{ID: "bad", Name: "bad", Address: "dns.example.com"})

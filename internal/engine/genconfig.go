@@ -48,6 +48,45 @@ const (
 
 var lanCIDRs = []string{"10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "169.254.0.0/16", "224.0.0.0/4", "255.255.255.255/32"}
 
+// IsLAN reports whether ip is in the ranges sent directly when local network
+// access is allowed.
+func IsLAN(ip net.IP) bool {
+	for _, c := range lanCIDRs {
+		if _, n, err := net.ParseCIDR(c); err == nil && n.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
+
+// OutboundFor names the engine outbound that traffic for a rule target goes
+// to; known holds the outbounds present in the config.
+func OutboundFor(target string, known map[string]bool) string {
+	switch target {
+	case config.TargetDirect:
+		return proxyDirect
+	case config.TargetBlock, "":
+		return proxyReject
+	}
+	if known[target] {
+		return target
+	}
+	// Target disabled/missing: fail closed, never fall back to direct.
+	return proxyReject
+}
+
+// Outbounds lists the outbound names of a generated config.
+func Outbounds(conf map[string]any) map[string]bool {
+	known := map[string]bool{}
+	ps, _ := conf["proxies"].([]map[string]any)
+	for _, p := range ps {
+		if n, ok := p["name"].(string); ok {
+			known[n] = true
+		}
+	}
+	return known
+}
+
 // Some services break with fake IPs (NTP, connectivity checks, STUN, consoles).
 var defaultFakeIPFilter = []string{
 	"*.lan", "*.local", "*.localdomain", "*.home.arpa", "localhost.*",
@@ -112,19 +151,7 @@ func Generate(in GenInput) (map[string]any, error) {
 		serverHosts = append(serverHosts, providers.ServerHosts(c)...)
 	}
 
-	target := func(t string) string {
-		switch t {
-		case config.TargetDirect:
-			return proxyDirect
-		case config.TargetBlock, "":
-			return proxyReject
-		}
-		if known[t] {
-			return t
-		}
-		// Target disabled/missing: fail closed, never fall back to direct.
-		return proxyReject
-	}
+	target := func(t string) string { return OutboundFor(t, known) }
 
 	var rules []string
 	for _, p := range in.SelfProcesses {
@@ -367,6 +394,9 @@ func ruleLines(r config.Rule, tgt string) ([]string, error) {
 	}
 	return out, nil
 }
+
+// NormalizeDomain turns a domain rule value into the name the engine matches.
+func NormalizeDomain(v string) string { return normalizeDomain(v) }
 
 func normalizeDomain(v string) string {
 	v = strings.ToLower(strings.TrimSpace(v))

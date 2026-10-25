@@ -4,6 +4,14 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Fixed
+
+- Domain rules now also work for programs that resolve names on their own (DNS over HTTPS in browsers, the browser inside apps) and connect to a bare IP: the site name is taken from the connection itself (TLS/QUIC SNI, HTTP Host). Before, such connections fell through to program rules or went directly.
+
+### Changed
+
+- Profile export opens a window with the profile as text to copy, or to save to a file; with passwords and keys included, the window warns that the text is a secret.
+
 ## [0.1.1] - 2026-10-21
 
 ### Added

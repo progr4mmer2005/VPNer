@@ -254,6 +254,7 @@ a, img, svg { -webkit-user-drag: none; }
 .drop { border: 1.5px dashed var(--line); border-radius: var(--radius); padding: 14px; display: flex; flex-direction: column; gap: 8px; }
 .drop.over { border-color: var(--accent); background: var(--accent-weak); }
 details > summary { cursor: pointer; color: var(--muted); margin: 6px 0 12px; user-select: none; }
+.export-text { width: 100%; height: min(46vh, 380px); resize: vertical; font-family: var(--mono); font-size: 12px; line-height: 1.45; white-space: pre; overflow: auto; }
 .logs.legal-text { height: min(60vh, 520px); margin: 0; padding: 10px 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .logs { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); font-family: var(--mono); font-size: 12px; height: calc(100vh - 230px); overflow: auto; padding: 8px 0; }
 .logs div { padding: 1px 12px; white-space: pre-wrap; word-break: break-word; }
@@ -2437,10 +2438,44 @@ async function enableHV() {
 }
 // Export goes through the standard Windows "Save as" dialog, not a browser
 // download.
+// The export window: the profile as text to copy, or to save to a file.
+// With passwords and keys the text is a secret, and the window says so.
 async function exportProfile() {
-  const secrets = !!($("#ex-secrets") && $("#ex-secrets").checked);
-  const r = await act(() => api("POST", "/api/export/save", { secrets }));
-  if (r && r.path) toast(tr("ui.settings.profileSaved", r.path));
+  let secrets = !!($("#ex-secrets") && $("#ex-secrets").checked), seq = 0;
+  const m = modal(`<header><h3>${tr("ui.exportProfile")}</h3><button class="icon-btn" onclick="closeModal()" aria-label="${tr("ui.close")}">${ICON.close}</button></header>
+    <div class="body">
+      <p class="help" style="color:var(--muted);font-size:12.5px;margin-top:0">${tr("ui.export.intro")}</p>
+      <div class="field"><label class="check"><input type="checkbox" class="switch" id="exm-secrets" ${secrets ? "checked" : ""}><span><b style="font-size:13px">${tr("ui.includePasswordsAndKeys")}</b></span></label></div>
+      <div id="exm-warn"></div>
+      <textarea id="exm-text" class="export-text" readonly spellcheck="false" aria-label="${tr("ui.exportProfile")}"></textarea>
+    </div>
+    <footer><button class="btn" onclick="closeModal()">${tr("ui.close")}</button><button class="btn" id="exm-save">${tr("ui.export.saveFile")}</button><button class="btn primary" id="exm-copy">${tr("ui.copy")}</button></footer>`, { wide: true });
+  const text = $("#exm-text", m), copy = $("#exm-copy", m), save = $("#exm-save", m);
+  const load = async () => {
+    const my = ++seq;
+    $("#exm-warn", m).innerHTML = secrets
+      ? `<div class="banner bad" style="margin:0 0 10px">${tr("ui.export.secretsWarning")}</div>`
+      : `<p class="help" style="color:var(--muted);font-size:12.5px;margin:0 0 10px">${tr("ui.export.noSecrets")}</p>`;
+    text.value = ""; copy.disabled = save.disabled = true;
+    try {
+      const r = await api("POST", "/api/export", { secrets });
+      if (my !== seq) return; // the switch was flipped again meanwhile
+      text.value = r.text; copy.disabled = save.disabled = false;
+    } catch (e) { if (my === seq) toast(e.message, true); }
+  };
+  $("#exm-secrets", m).onchange = e => {
+    secrets = e.target.checked;
+    const s = $("#ex-secrets"); if (s) s.checked = secrets;
+    load();
+  };
+  text.onfocus = () => text.select();
+  copy.onclick = () => navigator.clipboard.writeText(text.value)
+    .then(() => toast(tr(secrets ? "ui.export.copiedSecrets" : "ui.copied")), e => toast(e.message, true));
+  save.onclick = async () => {
+    const r = await act(() => api("POST", "/api/export/save", { secrets })).catch(() => null);
+    if (r && r.path) toast(tr("ui.settings.profileSaved", r.path));
+  };
+  load();
 }
 async function installWSL() {
   const r = await act(() => api("POST", "/api/wsl/install"));

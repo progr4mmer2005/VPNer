@@ -92,6 +92,26 @@ func TestSnifferForBareIPs(t *testing.T) {
 	}
 }
 
+// The outbound a rule target maps to is what live connections are compared
+// with when rules change.
+func TestOutboundFor(t *testing.T) {
+	m, err := Generate(GenInput{Cfg: testConfig(), ControllerPort: 9090, Secret: "s"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	known := Outbounds(m)
+	for target, want := range map[string]string{
+		config.TargetDirect: "direct-out", config.TargetBlock: "REJECT", "": "REJECT",
+		"cnl":   "cnl",    // native outbound, always present
+		"cwork": "REJECT", // WSL connection without an endpoint: not running
+		"gone":  "REJECT",
+	} {
+		if got := OutboundFor(target, known); got != want {
+			t.Errorf("OutboundFor(%q) = %q, want %q", target, got, want)
+		}
+	}
+}
+
 func TestDNSValidation(t *testing.T) {
 	cfg := testConfig()
 	cfg.DNS.Servers = append(cfg.DNS.Servers, config.DNSServer{ID: "bad", Name: "bad", Address: "dns.example.com"})

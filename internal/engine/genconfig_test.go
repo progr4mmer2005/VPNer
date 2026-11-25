@@ -1,0 +1,275 @@
+package engine
+
+import (
+	"net"
+	"os"
+	"strings"
+	"testing"
+
+	"gopkg.in/yaml.v3"
+
+	"vpner/internal/config"
+	"vpner/internal/providers"
+)
+
+func testConfig() *config.Config {
+	cfg := config.Default()
+	cfg.Connections = []config.Connection{
+		{ID: "cnl", Name: "NL", Type: "link", Enabled: true, Params: map[string]string{},
+			Secrets: map[string]string{"link": "trojan://pass@nl.example.com:443?sni=nl.example.com#NL"}},
+		{ID: "cwork", Name: "Work", Type: "openconnect", Enabled: true, Params: map[string]string{"server": "vpn.corp"}},
+	}
+	cfg.Rules = []config.Rule{
+		{Enabled: true, Kind: config.RuleProcess, Values: []string{"chrome.exe"}, Target: "cnl"},
+		{Enabled: true, Kind: config.RuleDomainSuffix, Values: []string{"corp.example"}, Target: "cwork"},
+	}
+	cfg.DNS = config.DNS{
+		Mode: config.DNSModeFakeIP,
+		Servers: []config.DNSServer{
+			{ID: "sys", Name: "system", Address: "system"},
+			{ID: "cf", Name: "Cloudflare DoH", Address: "https://1.1.1.1/dns-query", HTTP3: true},
+			{ID: "dot", Name: "Google DoT", Address: "tls://8.8.8.8"},
+			{ID: "doq", Name: "AdGuard DoQ", Address: "quic://94.140.14.14"},
+			{ID: "tcp", Name: "Quad9 TCP", Address: "tcp://9.9.9.9"},
+			{ID: "udp", Name: "Yandex", Address: "77.88.8.8"},
+			{ID: "vianl", Name: "DoH via NL", Address: "https://dns.google/dns-query", Via: "cnl"},
+		},
+		Default: []string{"cf", "vianl"},
+		Rules: []config.DNSRule{
+			{Enabled: true, Kind: "domain-suffix", Values: []string{"ru", "*.yandex.net"}, Server: "udp"},
+			{Enabled: true, Kind: "geosite", Values: []string{"category-ads-all"}, Server: "doq"},
+			{Enabled: true, Kind: "domain", Values: []string{"intranet.local"}, Server: "sys"},
+		},
+	}
+	return cfg
+}
+
+func TestDNSGeneration(t *testing.T) {
+	cfg := testConfig()
+	if err := cfg.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	m, err := Generate(GenInput{Cfg: cfg, ControllerPort: 9090, Secret: "s"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	dns := m["dns"].(map[string]any)
+	ns := strings.Join(dns["nameserver"].([]string), " ")
+	if ns != "https://1.1.1.1/dns-query#h3=true https://dns.google/dns-query#cnl" {
+		t.Errorf("nameserver = %q", ns)
+	}
+	if p := strings.Join(dns["proxy-server-nameserver"].([]string), " "); p != "https://1.1.1.1/dns-query#h3=true" {
+		t.Errorf("proxy-server-nameserver must avoid VPN-routed servers: %q", p)
+	}
+	pol := dns["nameserver-policy"].(map[string]any)
+	for key, want := range map[string]string{"+.ru": "77.88.8.8", "+.yandex.net": "77.88.8.8", "geosite:category-ads-all": "quic://94.140.14.14", "intranet.local": "system"} {
+		got, ok := pol[key].([]string)
+		if !ok || got[0] != want {
+			t.Errorf("policy[%s] = %v, want %s", key, pol[key], want)
+		}
+	}
+}
+
+// Programs with their own DNS connect to bare IPs: the engine must take the
+// site name from the connection for domain rules, without changing where the
+// connection goes.
+func TestSnifferForBareIPs(t *testing.T) {
+	m, err := Generate(GenInput{Cfg: testConfig(), ControllerPort: 9090, Secret: "s"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sn, ok := m["sniffer"].(map[string]any)
+	if !ok || sn["enable"] != true || sn["parse-pure-ip"] != true {
+		t.Fatalf("sniffer must be on for bare IPs: %v", m["sniffer"])
+	}
+	if sn["force-dns-mapping"] != false || sn["override-destination"] != false {
+		t.Errorf("sniffing must not touch FakeIP connections or the destination: %v", sn)
+	}
+	for proto, port := range map[string]string{"TLS": "443", "QUIC": "443", "HTTP": "80"} {
+		p, _ := sn["sniff"].(map[string]any)[proto].(map[string]any)
+		if p == nil || !strings.Contains(strings.Join(p["ports"].([]string), ","), port) || p["override-destination"] != false {
+			t.Errorf("sniff %s = %v", proto, p)
+		}
+	}
+}
+
+// A FakeIP address the engine no longer knows must not be sniffed: with the
+// destination kept it would be dialed to the fake address and hang. Skipped,
+// the engine drops it at once and the program asks DNS again. Real addresses
+// are still sniffed and keep their destination.
+func TestSnifferSkipsStaleFakeIPs(t *testing.T) {
+	m, err := Generate(GenInput{Cfg: testConfig(), ControllerPort: 9090, Secret: "s"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sn := m["sniffer"].(map[string]any)
+	skip, _ := sn["skip-dst-address"].([]string)
+	_, fake, err := net.ParseCIDR(m["dns"].(map[string]any)["fake-ip-range"].(string))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(skip) != 1 || skip[0] != fake.String() {
+		t.Errorf("skip-dst-address = %v, want the FakeIP range %s only", skip, fake)
+	}
+	if sn["override-destination"] != false {
+		t.Error("real addresses must keep their destination")
+	}
+}
+
+// The outbound a rule target maps to is what live connections are compared
+// with when rules change.
+func TestOutboundFor(t *testing.T) {
+	m, err := Generate(GenInput{Cfg: testConfig(), ControllerPort: 9090, Secret: "s"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	known := Outbounds(m)
+	for target, want := range map[string]string{
+		config.TargetDirect: "direct-out", config.TargetBlock: "REJECT", "": "REJECT",
+		"cnl":   "cnl",    // native outbound, always present
+		"cwork": "REJECT", // WSL connection without an endpoint: not running
+		"gone":  "REJECT",
+	} {
+		if got := OutboundFor(target, known); got != want {
+			t.Errorf("OutboundFor(%q) = %q, want %q", target, got, want)
+		}
+	}
+}
+
+// A DNS server reached through a connection that is not running (a VM still
+// starting) is left out: mihomo would take "#<id>" for a network interface and
+// fail every query, leaving the computer without DNS. Once the connection
+// runs, the server is used again.
+func TestDNSViaConnectionNotRunning(t *testing.T) {
+	cfg := testConfig()
+	cfg.DNS.Servers = append(cfg.DNS.Servers, config.DNSServer{ID: "viawork", Name: "DoH via work", Address: "https://dns.example/dns-query", Via: "cwork"})
+	cfg.DNS.Default = []string{"viawork"}
+	cfg.DNS.Rules = append(cfg.DNS.Rules, config.DNSRule{Enabled: true, Kind: "domain-suffix", Values: []string{"corp.example"}, Server: "viawork"})
+	if err := cfg.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	gen := func(eps map[string]LocalEndpoint) map[string]any {
+		m, err := Generate(GenInput{Cfg: cfg, ControllerPort: 9090, Secret: "s", Endpoints: eps})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return m["dns"].(map[string]any)
+	}
+
+	// cwork has no endpoint yet: not running
+	dns := gen(nil)
+	if ns := strings.Join(dns["nameserver"].([]string), " "); ns != "system" {
+		t.Errorf("nameserver while the connection is down = %q, want system", ns)
+	}
+	if pol, _ := dns["nameserver-policy"].(map[string]any); pol["+.corp.example"] != nil {
+		t.Errorf("a DNS rule through a connection that is down must fall to the default servers: %v", pol["+.corp.example"])
+	}
+	for _, ns := range dns["nameserver"].([]string) {
+		if strings.Contains(ns, "#cwork") {
+			t.Error("#cwork without the outbound is taken for an interface")
+		}
+	}
+
+	// running: queries go through it again
+	dns = gen(map[string]LocalEndpoint{"cwork": {Port: 30001, User: "u", Pass: "p"}})
+	if ns := strings.Join(dns["nameserver"].([]string), " "); ns != "https://dns.example/dns-query#cwork" {
+		t.Errorf("nameserver while the connection runs = %q", ns)
+	}
+	if pol := dns["nameserver-policy"].(map[string]any); pol["+.corp.example"] == nil {
+		t.Error("the DNS rule must use its server again")
+	}
+}
+
+func TestDNSValidation(t *testing.T) {
+	cfg := testConfig()
+	cfg.DNS.Servers = append(cfg.DNS.Servers, config.DNSServer{ID: "bad", Name: "bad", Address: "dns.example.com"})
+	if err := cfg.Validate(); err == nil {
+		t.Error("plain DNS by hostname must be rejected")
+	}
+	cfg = testConfig()
+	cfg.DNS.Servers[0].Via = "cnl" // system via VPN makes no sense
+	if err := cfg.Validate(); err == nil {
+		t.Error("system resolver through a VPN must be rejected")
+	}
+}
+
+// TestMihomoAccepts runs the real engine in test mode when VPNER_MIHOMO
+// points to mihomo.exe.
+func TestMihomoAccepts(t *testing.T) {
+	bin := os.Getenv("VPNER_MIHOMO")
+	if bin == "" {
+		t.Skip("set VPNER_MIHOMO to mihomo.exe to run")
+	}
+	m, err := Generate(GenInput{Cfg: testConfig(), ControllerPort: 9090, Secret: "s",
+		Endpoints: map[string]LocalEndpoint{"cwork": {Port: 30001, User: "u", Pass: "p"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mh := &Mihomo{Bin: bin, WorkDir: t.TempDir()}
+	if err := mh.Test(m); err != nil {
+		b, _ := yaml.Marshal(m["dns"])
+		t.Fatalf("%v\n%s", err, b)
+	}
+}
+
+const testWG = `[Interface]
+PrivateKey = yAnz5TF+lXXJte14tji3zlMNq+hd2rYUIgJBgB3fBmk=
+Address = 10.8.0.2/32
+DNS = 1.1.1.1
+
+[Peer]
+PublicKey = xTIBA5rboUvnH4htodjb6e697QjLERt1NAB4mZqp8Dg=
+Endpoint = 203.0.113.5:51820
+AllowedIPs = 0.0.0.0/0
+`
+
+// A WireGuard connection with an endpoint runs in the tunnel process: the
+// routing engine reaches it over SOCKS5 and holds no WireGuard device.
+func TestTunnelSplit(t *testing.T) {
+	cfg := testConfig()
+	cfg.Connections = append(cfg.Connections, config.Connection{ID: "cwg", Name: "WG", Type: "wireguard", Enabled: true,
+		Params: map[string]string{}, Secrets: map[string]string{"config": testWG}})
+	cfg.Rules = append(cfg.Rules, config.Rule{Enabled: true, Kind: config.RuleDomainSuffix, Values: []string{"example.org"}, Target: "cwg"})
+	ep := LocalEndpoint{Port: 30002, User: "u", Pass: "p"}
+	m, err := Generate(GenInput{Cfg: cfg, ControllerPort: 9090, Secret: "s", NoIPv6: true,
+		Endpoints: map[string]LocalEndpoint{"cwork": {Port: 30001, User: "u", Pass: "p"}, "cwg": ep}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range m["proxies"].([]map[string]any) {
+		switch p["name"] {
+		case "cwg":
+			if p["type"] != "socks5" || p["port"] != 30002 {
+				t.Errorf("tunnel connection must be reached over SOCKS5: %v", p)
+			}
+		case proxyDirect:
+			if p["ip-version"] != "ipv4" {
+				t.Errorf("without IPv6 direct must be IPv4 only: %v", p)
+			}
+		}
+	}
+	wg, _ := providers.Get("wireguard")
+	out, err := wg.(providers.NativeProvider).Outbound(cfg.Conn("cwg"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !IsTunnelOutbound(out) {
+		t.Fatal("wireguard must go to the tunnel process")
+	}
+	tc := GenerateTunnels(TunnelInput{Outbounds: map[string]map[string]any{"cwg": out},
+		Ports: map[string]int{"cwg": 30002}, User: "u", Pass: "p", ControllerPort: 9091, Secret: "s"})
+	ls := tc["listeners"].([]map[string]any)
+	if len(ls) != 1 || ls[0]["port"] != 30002 || ls[0]["proxy"] != "cwg" {
+		t.Errorf("listeners = %v", ls)
+	}
+	if _, ok := tc["tun"]; ok {
+		t.Error("the tunnel process must not open a TUN")
+	}
+	if bin := os.Getenv("VPNER_MIHOMO"); bin != "" {
+		for _, c := range []map[string]any{m, tc} {
+			if err := (&Mihomo{Bin: bin, WorkDir: t.TempDir()}).Test(c); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+}

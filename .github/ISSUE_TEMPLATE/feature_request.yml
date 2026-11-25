@@ -1,0 +1,16 @@
+name: Idea / Идея
+description: Suggest a feature or an improvement / Предложить возможность или улучшение
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: The idea / Идея
+      description: What should VPNer do, and why is it useful? / Что должен уметь VPNer и зачем это нужно?
+    validations:
+      required: true
+  - type: textarea
+    id: case
+    attributes:
+      label: Your case / Ваш сценарий
+      description: Which VPNs, programs or sites are involved. / Какие VPN, программы или сайты участвуют.
